@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import orgPhoto from '../assets/images/scout guide department photo.jpg';
-import trainingPhoto from '../assets/images/Training center socut guid.jpeg';
-import itPhoto from '../assets/images/IT department scout guid.jpg';
+import orgPhoto from '../assets/Images/scout guide department photo.jpg';
+import trainingPhoto from '../assets/Images/Training center socut guid.jpeg';
+import itPhoto from '../assets/Images/IT department scout guid.jpg';
 
 function LearningPaths() {
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
