@@ -1,6 +1,6 @@
 function Testimonials() {
   return (
-    <section id="testimonials" className="bg-[#f8f5ff] py-16 md:py-24 relative overflow-hidden">
+    <section id="testimonials" className="bg-[#f8f5ff] pt-8 pb-16 md:pb-24 relative overflow-hidden">
       {/* Decorative background elements */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-[#7c3aed]/5 rounded-full blur-3xl -mx-20 -my-20"></div>
       <div className="absolute bottom-0 left-0 w-80 h-80 bg-[#7c3aed]/10 rounded-full blur-3xl -mx-20 -my-20"></div>

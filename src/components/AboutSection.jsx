@@ -1,6 +1,6 @@
 function AboutSection() {
   return (
-    <section id="about" className="bg-slate-50 py-16 md:py-24">
+    <section id="about" className="bg-slate-50 pt-8 pb-16 md:pb-24">
       <div className="container flex flex-col items-center gap-12 lg:flex-row lg:gap-16">
         {/* Image */}
         <div className="w-full lg:w-1/2">

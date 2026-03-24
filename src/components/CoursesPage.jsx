@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import Navbar from './Navbar';
 import Footer from './Footer';
 
+const DEPARTMENTS = ["Organization", "Training", "IT"];
+
 // Dummy data for courses
 const MOCK_COURSES = Array.from({ length: 24 }).map((_, i) => ({
   id: i + 1,
@@ -9,18 +11,28 @@ const MOCK_COURSES = Array.from({ length: 24 }).map((_, i) => ({
   description: "Learn the fundamentals of Scouting & Guiding, teamwork, and leadership skills.",
   image: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=400&h=250&fit=crop",
   duration: "4 Weeks",
-  level: "Beginner"
+  level: "Beginner",
+  department: DEPARTMENTS[i % DEPARTMENTS.length]
 }));
 
 const CoursesPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
-  const cardsPerPage = 6; // "only X card must be visible", assuming 6 or 10. Let's do 6 for a nice grid.
+  const [activeFilter, setActiveFilter] = useState('All');
+  const cardsPerPage = 6;
+
+  const filteredCourses = activeFilter === 'All' 
+    ? MOCK_COURSES 
+    : MOCK_COURSES.filter(course => course.department === activeFilter);
 
   const indexOfLastCard = currentPage * cardsPerPage;
   const indexOfFirstCard = indexOfLastCard - cardsPerPage;
-  const currentCards = MOCK_COURSES.slice(indexOfFirstCard, indexOfLastCard);
+  const currentCards = filteredCourses.slice(indexOfFirstCard, indexOfLastCard);
 
-  const totalPages = Math.ceil(MOCK_COURSES.length / cardsPerPage);
+  const totalPages = Math.ceil(filteredCourses.length / cardsPerPage);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeFilter]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -31,7 +43,7 @@ const CoursesPage = () => {
   };
 
   return (
-    <div className="pt-24 pb-16 min-h-screen bg-slate-50">
+    <div className="pt-8 pb-16 min-h-screen bg-slate-50">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
           <h1 className="text-3xl md:text-5xl font-bold text-slate-900 mb-4">
@@ -41,6 +53,23 @@ const CoursesPage = () => {
             Browse our comprehensive collection of training programs designed to develop leadership, character, and practical skills.
           </p>
           <div className="h-1 w-20 bg-[#7c3aed] mx-auto rounded-full mt-6" />
+        </div>
+
+        {/* Filters */}
+        <div className="flex flex-wrap justify-center gap-3 mb-10">
+          {['All', 'Organization', 'Training', 'IT'].map(dept => (
+            <button
+              key={dept}
+              onClick={() => setActiveFilter(dept)}
+              className={`px-5 py-2 rounded-full font-medium transition-colors ${
+                activeFilter === dept
+                  ? 'bg-[#7c3aed] text-white shadow-md'
+                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              {dept === 'All' ? 'All Departments' : `${dept} Department`}
+            </button>
+          ))}
         </div>
 
         {/* Courses Grid */}
@@ -53,11 +82,16 @@ const CoursesPage = () => {
                 className="w-full h-48 object-cover"
               />
               <div className="p-6 flex-1 flex flex-col">
-                <div className="flex items-center justify-between mb-3 text-sm text-slate-500 font-medium">
-                  <span className="bg-[#7c3aed]/10 text-[#7c3aed] px-3 py-1 rounded-full">
-                    {course.level}
-                  </span>
-                  <span className="flex items-center gap-1">
+                <div className="flex items-center justify-between mb-3 text-sm text-slate-500 font-medium whitespace-nowrap overflow-hidden">
+                  <div className="flex gap-2 items-center">
+                    <span className="bg-[#7c3aed]/10 text-[#7c3aed] px-3 py-1 rounded-full text-xs truncate max-w-[100px]" title={course.level}>
+                      {course.level}
+                    </span>
+                    <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs truncate max-w-[120px]" title={`${course.department} Dept`}>
+                      {course.department} Dept
+                    </span>
+                  </div>
+                  <span className="flex items-center gap-1 shrink-0">
                     <span className="material-symbols-outlined text-base">schedule</span>
                     {course.duration}
                   </span>

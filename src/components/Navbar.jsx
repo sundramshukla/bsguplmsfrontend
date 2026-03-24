@@ -31,16 +31,16 @@ const Navbar = () => {
     <>
       <header className="navbar">
         <div className="container nav-container">
-          <div className="logo">
+          <div className="logo cursor-pointer" onClick={() => window.location.hash = '#'}>
             <span className="logo-icon">📘</span>
             BS<span className="highlight">GUP</span>
           </div>
 
           <nav className="nav-links">
-            <a href="#">Courses</a>
-            <a href="#">About Us</a>
-            <a href="#">Testimonials</a>
-            <a href="#">Contact</a>
+            <a href="#courses">Courses</a>
+            <a href="#about">About Us</a>
+            <a href="#testimonials">Testimonials</a>
+            <a href="#contact">Contact</a>
           </nav>
 
           <div className="nav-actions">
