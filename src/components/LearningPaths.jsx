@@ -16,7 +16,7 @@ function LearningPaths() {
     e.preventDefault();
     if (!formData.name || !formData.email || !formData.phone) {
       alert('Please fill all fields.');
-      return;
+      return;  
     }
     // Simulate registration (localStorage optional)
     localStorage.setItem('registration', JSON.stringify(formData));
