@@ -76,7 +76,7 @@
   .hero {
     position: relative;
     height: 90vh;
-    background: url("https://images.unsplash.com/photo-1522202176988-66273c2fd55f")
+    background: url("../assets/Images/Scout_heropage.jpeg")
       center/cover no-repeat;
     display: flex;
     align-items: center;
