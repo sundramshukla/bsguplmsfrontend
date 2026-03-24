@@ -5,11 +5,13 @@ function AboutSection() {
         {/* Image */}
         <div className="w-full lg:w-1/2">
           <div className="relative">
-            <img
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuCUAdiqE9kEOG5wKufWfByFBkfZdf3xgOP-HV9l8fLFbodzvl70uhx2YHH31BkipD8nPpcJhzRpgoqpr42CrChzCM4_GcYeLjn9_Fltru-lkS14csGLpHXm8u2K-0KeFt12eg78NpIr_Ctshyb45z4vodWlhb6Yxut_s4DwUhkze1Z4rRVeAmM7ppcHCa9mYAfO76zYNeXGG4sAs62yLmFTYa8kJUIN2iWFirc2rzX8hL84TLc7o6mkYTuzr7AACJcEjAaomeXi4gG5"
-              alt="Team working together"
+            <iframe
+              src="https://www.youtube.com/embed/tXdovpsdkYA?si=dgIQy7NzT8CsCAkp"
+              title="YouTube video player"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
               className="h-[360px] w-full rounded-2xl object-cover shadow-xl md:h-[420px]"
-            />
+            ></iframe>
             <div className="absolute -bottom-6 right-6 hidden rounded-2xl bg-[#7c3aed] px-7 py-6 text-white shadow-xl sm:block">
               <p className="text-4xl font-extrabold leading-none">75+</p>
               <p className="mt-1 text-sm opacity-90">Years of Excellence</p>
