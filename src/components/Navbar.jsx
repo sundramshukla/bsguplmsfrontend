@@ -45,7 +45,7 @@ const Navbar = () => {
     
     try {
       setIsLoading(true);
-      const res = await fetch(`http://bsguplms.pythonanywhere.com/bsgupadmin/register?mobile_number=${formData.mobile_number}&role=student`);
+      const res = await fetch(`https://bsguplmps.pythonanywhere.com/bsgupadmin/register?mobile_number=${formData.mobile_number}&role=student`);
       if (res.ok) {
         setAuthType('register');
         setOtpMode(true);
@@ -69,7 +69,7 @@ const Navbar = () => {
 
     try {
       setIsLoading(true);
-      const res = await fetch(`http://bsguplms.pythonanywhere.com/bsgupadmin/login?mobile_number=${loginMobile}`);
+      const res = await fetch(`https://bsguplmps.pythonanywhere.com/bsgupadmin/login?mobile_number=${loginMobile}`);
       if (res.ok) {
         setAuthType('login');
         setOtpMode(true);
@@ -97,17 +97,17 @@ const Navbar = () => {
       let payload = {};
 
       if (authType === 'register') {
-        url = "http://bsguplms.pythonanywhere.com/bsgupadmin/register/";
+        url = "https://bsguplmps.pythonanywhere.com/bsgupadmin/register/";
         payload = {
-            mobile_number: formData.mobile_number,
-            otp: parseInt(otp),
+            mobile_number: parseInt(formData.mobile_number, 10),
+            otp: parseInt(otp, 10),
             role: "student"
         };
       } else if (authType === 'login') {
-        url = "http://bsguplms.pythonanywhere.com/bsgupadmin/login/";
+        url = "https://bsguplmps.pythonanywhere.com/bsgupadmin/login/";
         payload = {
-            mobile_number: loginMobile,
-            otp: parseInt(otp)
+            mobile_number: parseInt(loginMobile, 10),
+            otp: parseInt(otp, 10)
         };
       }
 
