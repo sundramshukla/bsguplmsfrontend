@@ -21,7 +21,7 @@ const AdminProfile = () => {
   const fetchProfile = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`https://bsguplmps.pythonanywhere.com/bsgupadmin/profile/?user_id=${userId}`);
+      const res = await fetch(`https://softwarebsguplms.pythonanywhere.com/bsgupadmin/profile/?user_id=${userId}`);
       const data = await res.json();
       
       // If profile exists
@@ -79,7 +79,7 @@ const AdminProfile = () => {
 
     try {
       const method = isUpdating ? 'PUT' : 'POST';
-      const res = await fetch('https://bsguplmps.pythonanywhere.com/bsgupadmin/profile/', {
+      const res = await fetch('https://softwarebsguplms.pythonanywhere.com/bsgupadmin/profile/', {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

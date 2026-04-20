@@ -1,10 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "../CSS/style.css";
 
 const Navbar = () => {
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(localStorage.getItem('isLoggedIn') === 'true');
   
   // User Data
   const [formData, setFormData] = useState({ name: '', email: '', mobile_number: '' });
@@ -15,6 +15,18 @@ const Navbar = () => {
   const [otp, setOtp] = useState('');
   const [authType, setAuthType] = useState(''); // 'register' or 'login'
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const handleEvent = () => {
+      setIsRegisterOpen(true);
+      setIsLoginOpen(false);
+      setOtpMode(false);
+      setOtp('');
+      setFormData({ name: '', email: '', mobile_number: '' });
+    };
+    window.addEventListener('openRegisterModal', handleEvent);
+    return () => window.removeEventListener('openRegisterModal', handleEvent);
+  }, []);
 
   const handleFormChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -45,8 +57,15 @@ const Navbar = () => {
     
     try {
       setIsLoading(true);
-      const res = await fetch(`https://bsguplmps.pythonanywhere.com/bsgupadmin/register?mobile_number=${formData.mobile_number}&role=student`);
+      const res = await fetch(`https://softwarebsguplms.pythonanywhere.com/bsgupadmin/register/?mobile_number=${formData.mobile_number}&role=student`, {
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
       if (res.ok) {
+        const data = await res.json();
+        console.log("Register response:", data);
+        alert(`Development Info: The OTP is ${data.otp}`);
         setAuthType('register');
         setOtpMode(true);
       } else {
@@ -69,8 +88,15 @@ const Navbar = () => {
 
     try {
       setIsLoading(true);
-      const res = await fetch(`https://bsguplmps.pythonanywhere.com/bsgupadmin/login?mobile_number=${loginMobile}`);
+      const res = await fetch(`https://softwarebsguplms.pythonanywhere.com/bsgupadmin/login/?mobile_number=${loginMobile}`, {
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
       if (res.ok) {
+        const data = await res.json();
+        console.log("Login response:", data);
+        alert(`Development Info: The OTP is ${data.otp}`);
         setAuthType('login');
         setOtpMode(true);
       } else {
@@ -97,14 +123,14 @@ const Navbar = () => {
       let payload = {};
 
       if (authType === 'register') {
-        url = "https://bsguplmps.pythonanywhere.com/bsgupadmin/register/";
+        url = `https://softwarebsguplms.pythonanywhere.com/bsgupadmin/register/?mobile_number=${formData.mobile_number}&role=student`;
         payload = {
             mobile_number: parseInt(formData.mobile_number, 10),
             otp: parseInt(otp, 10),
             role: "student"
         };
       } else if (authType === 'login') {
-        url = "https://bsguplmps.pythonanywhere.com/bsgupadmin/login/";
+        url = `https://softwarebsguplms.pythonanywhere.com/bsgupadmin/login/?mobile_number=${loginMobile}`;
         payload = {
             mobile_number: parseInt(loginMobile, 10),
             otp: parseInt(otp, 10)
@@ -122,6 +148,8 @@ const Navbar = () => {
       if (res.ok) {
         // success
         setIsLoggedIn(true);
+        localStorage.setItem('isLoggedIn', 'true');
+        window.dispatchEvent(new Event('authChange'));
         if (authType === 'login' && !formData.name) {
           // just a fallback if name is not set
           setFormData(prev => ({ ...prev, name: 'Student' }));
@@ -142,6 +170,8 @@ const Navbar = () => {
 
   const handleLogout = () => {
     setIsLoggedIn(false);
+    localStorage.removeItem('isLoggedIn');
+    window.dispatchEvent(new Event('authChange'));
     setFormData({ name: '', email: '', mobile_number: '' });
     setLoginMobile('');
   };
@@ -178,9 +208,9 @@ const Navbar = () => {
                   Hi, {formData.name ? formData.name.split(' ')[0] : 'Student'} ▼
                 </button>
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-30 border border-slate-200 hidden group-hover:block">
-                  <a href="#" className="block px-4 py-2 text-sm text-slate-900 hover:bg-slate-100">My Profile</a>
-                  <a href="#" className="block px-4 py-2 text-sm text-slate-900 hover:bg-slate-100">Payment History</a>
-                  <a href="#" className="block px-4 py-2 text-sm text-slate-900 hover:bg-slate-100">My Courses</a>
+                  <a href="#" onClick={(e) => { e.preventDefault(); alert("Profile page is under construction!"); }} className="block px-4 py-2 text-sm text-slate-900 hover:bg-slate-100">My Profile</a>
+                  <a href="#" onClick={(e) => { e.preventDefault(); alert("Payment history is under construction!"); }} className="block px-4 py-2 text-sm text-slate-900 hover:bg-slate-100">Payment History</a>
+                  <a href="#" onClick={(e) => { e.preventDefault(); alert("My courses dashboard is under construction!"); }} className="block px-4 py-2 text-sm text-slate-900 hover:bg-slate-100">My Courses</a>
                   <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">Logout</button>
                 </div>
               </div>
@@ -248,6 +278,11 @@ const Navbar = () => {
                     className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/50 focus:border-[#7c3aed]"
                     required
                   />
+                  <div className="flex justify-end mt-2">
+                    <button type="button" onClick={handleRegisterSubmit} disabled={isLoading} className="text-sm font-semibold text-[#7c3aed] hover:text-[#6d28d9] disabled:opacity-50">
+                      Resend OTP
+                    </button>
+                  </div>
                 </div>
                 <button
                   type="submit"
@@ -304,6 +339,11 @@ const Navbar = () => {
                     className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/50 focus:border-[#7c3aed]"
                     required
                   />
+                  <div className="flex justify-end mt-2">
+                    <button type="button" onClick={handleLoginSubmit} disabled={isLoading} className="text-sm font-semibold text-[#7c3aed] hover:text-[#6d28d9] disabled:opacity-50">
+                      Resend OTP
+                    </button>
+                  </div>
                 </div>
                 <button
                   type="submit"

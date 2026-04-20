@@ -12,14 +12,14 @@ const AdminCourses = () => {
     priceAmount: '', priceCurrency: '₹', 
     durationValue: '', durationUnit: 'months', 
     durationHours: '', durationMinutes: '', durationSeconds: '',
-    department: 'Training', user: '1'
+    department: 'training', user: '1'
   });
   const [file, setFile] = useState(null);
 
   const fetchCourses = async () => {
     setLoading(true);
     try {
-      const res = await fetch('https://bsguplmps.pythonanywhere.com/bsgupadmin/createcourse/');
+      const res = await fetch('https://softwarebsguplms.pythonanywhere.com/bsgupadmin/createcourse/');
       const data = await res.json();
       if (data.success && data.data) {
         setCourses(data.data);
@@ -82,14 +82,14 @@ const AdminCourses = () => {
         durationMinutes: dMins,
         durationSeconds: dSecs,
         department: course.department 
-          ? course.department.charAt(0).toUpperCase() + course.department.slice(1).toLowerCase() 
-          : 'Training', // standardize to Organization/Training/It
+          ? course.department.toLowerCase() 
+          : 'training', // standardize to backend choices
         user: course.user || '1'
       });
     } else {
       setEditingCourse(null);
       setFormData({
-        title: '', description: '', priceAmount: '', priceCurrency: '₹', durationValue: '', durationUnit: 'months', durationHours: '', durationMinutes: '', durationSeconds: '', department: 'Training', user: '1'
+        title: '', description: '', priceAmount: '', priceCurrency: '₹', durationValue: '', durationUnit: 'months', durationHours: '', durationMinutes: '', durationSeconds: '', department: 'training', user: '1'
       });
     }
     setFile(null);
@@ -131,7 +131,7 @@ const AdminCourses = () => {
     }
 
     try {
-      const url = 'https://bsguplmps.pythonanywhere.com/bsgupadmin/createcourse/';
+      const url = 'https://softwarebsguplms.pythonanywhere.com/bsgupadmin/createcourse/';
       const method = isEditing ? 'PUT' : 'POST';
       
       const res = await fetch(url, { method, body: fd });
@@ -152,7 +152,7 @@ const AdminCourses = () => {
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this course?")) return;
     try {
-      const res = await fetch(`https://bsguplmps.pythonanywhere.com/bsgupadmin/createcourse/?course_id=${id}`, {
+      const res = await fetch(`https://softwarebsguplms.pythonanywhere.com/bsgupadmin/createcourse/?course_id=${id}`, {
         method: 'DELETE'
       });
       const data = await res.json();
@@ -233,9 +233,9 @@ const AdminCourses = () => {
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1">Department</label>
               <select name="department" value={formData.department} onChange={handleChange} required className="w-full border border-slate-300 p-2.5 rounded focus:ring-2 focus:ring-[#7c3aed] focus:outline-none">
-                <option value="Organization">Organization</option>
-                <option value="Training">Training</option>
-                <option value="It">IT</option>
+                <option value="organisation">Organization</option>
+                <option value="training">Training</option>
+                <option value="it">IT</option>
               </select>
             </div>
 
@@ -264,7 +264,7 @@ const AdminCourses = () => {
           {courses.map(course => (
             <div key={course.id} className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-shadow duration-300 overflow-hidden flex flex-col border border-slate-200 group">
               {course.course_profile_pic ? (
-                <img src={`https://bsguplmps.pythonanywhere.com${course.course_profile_pic}`} alt={course.title} className="w-full h-44 object-cover" />
+                <img src={`https://softwarebsguplms.pythonanywhere.com${course.course_profile_pic}`} alt={course.title} className="w-full h-44 object-cover" />
               ) : (
                 <div className="w-full h-44 bg-slate-200 flex items-center justify-center text-slate-400">No Image provided</div>
               )}

@@ -2,27 +2,61 @@ import React, { useState, useEffect } from "react";
 import Navbar from './Navbar';
 import Footer from './Footer';
 
-const DEPARTMENTS = ["Organization", "Training", "IT"];
-
-// Dummy data for courses
-const MOCK_COURSES = Array.from({ length: 24 }).map((_, i) => ({
-  id: i + 1,
-  title: `Beginner Course ${i + 1}`,
-  description: "Learn the fundamentals of Scouting & Guiding, teamwork, and leadership skills.",
-  image: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=400&h=250&fit=crop",
-  duration: "4 Weeks",
-  level: "Beginner",
-  department: DEPARTMENTS[i % DEPARTMENTS.length]
-}));
+const DEPARTMENTS_MAP = {
+  organisation: 'Organization',
+  training: 'Training',
+  it: 'IT'
+};
 
 const CoursesPage = () => {
+  const [courses, setCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [activeFilter, setActiveFilter] = useState('All');
+  const [isLoggedIn, setIsLoggedIn] = useState(localStorage.getItem('isLoggedIn') === 'true');
   const cardsPerPage = 6;
 
+  useEffect(() => {
+    const fetchCourses = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch('https://softwarebsguplms.pythonanywhere.com/bsgupadmin/createcourse/');
+        const data = await res.json();
+        if (data.success && data.data) {
+          const formattedCourses = data.data.map(c => ({
+            id: c.id,
+            title: c.title,
+            description: c.description,
+            image: c.course_profile_pic ? `https://softwarebsguplms.pythonanywhere.com${c.course_profile_pic}` : "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=400&h=250&fit=crop",
+            duration: c.duration || "4 Weeks",
+            level: "Beginner", // hardcoded as fallback but can be dynamic if backend adds it
+            department: DEPARTMENTS_MAP[c.department] || "Organization",
+            price: c.price
+          }));
+          // sort by ID descending so newest is first
+          setCourses(formattedCourses.sort((a,b) => b.id - a.id));
+        }
+      } catch (err) {
+        console.error('Failed to fetch courses:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchCourses();
+  }, []);
+
+  useEffect(() => {
+    const handleAuthChange = () => {
+      setIsLoggedIn(localStorage.getItem('isLoggedIn') === 'true');
+    };
+    window.addEventListener('authChange', handleAuthChange);
+    return () => window.removeEventListener('authChange', handleAuthChange);
+  }, []);
+
   const filteredCourses = activeFilter === 'All' 
-    ? MOCK_COURSES 
-    : MOCK_COURSES.filter(course => course.department === activeFilter);
+    ? courses 
+    : courses.filter(course => course.department === activeFilter);
 
   const indexOfLastCard = currentPage * cardsPerPage;
   const indexOfFirstCard = indexOfLastCard - cardsPerPage;
@@ -73,40 +107,70 @@ const CoursesPage = () => {
         </div>
 
         {/* Courses Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
-          {currentCards.map((course) => (
-            <div key={course.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-shadow border border-slate-100 flex flex-col">
-              <img 
-                src={course.image} 
-                alt={course.title} 
-                className="w-full h-48 object-cover"
-              />
-              <div className="p-6 flex-1 flex flex-col">
-                <div className="flex items-center justify-between mb-3 text-sm text-slate-500 font-medium whitespace-nowrap overflow-hidden">
-                  <div className="flex gap-2 items-center">
-                    <span className="bg-[#7c3aed]/10 text-[#7c3aed] px-3 py-1 rounded-full text-xs truncate max-w-[100px]" title={course.level}>
-                      {course.level}
-                    </span>
-                    <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs truncate max-w-[120px]" title={`${course.department} Dept`}>
-                      {course.department} Dept
+        {loading ? (
+          <div className="flex justify-center p-12">
+            <p className="text-xl text-slate-500 font-medium">Loading courses...</p>
+          </div>
+        ) : filteredCourses.length === 0 ? (
+          <div className="flex justify-center p-12">
+            <p className="text-xl text-slate-500 font-medium">No courses available for this department.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+            {currentCards.map((course) => (
+              <div key={course.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-shadow border border-slate-100 flex flex-col">
+                <img 
+                  src={course.image} 
+                  alt={course.title} 
+                  className="w-full h-48 object-cover"
+                />
+                <div className="p-6 flex-1 flex flex-col">
+                  <div className="flex items-center justify-between mb-3 text-sm text-slate-500 font-medium whitespace-nowrap overflow-hidden">
+                    <div className="flex gap-2 items-center">
+                      <span className="bg-[#7c3aed]/10 text-[#7c3aed] px-3 py-1 rounded-full text-xs truncate max-w-[100px]" title={course.level}>
+                        {course.level}
+                      </span>
+                      <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs truncate max-w-[120px]" title={`${course.department} Dept`}>
+                        {course.department} Dept
+                      </span>
+                    </div>
+                    <span className="flex items-center gap-1 shrink-0">
+                      <span className="material-symbols-outlined text-base">schedule</span>
+                      {course.duration}
                     </span>
                   </div>
-                  <span className="flex items-center gap-1 shrink-0">
-                    <span className="material-symbols-outlined text-base">schedule</span>
-                    {course.duration}
-                  </span>
+                  <h3 className="text-xl font-bold text-slate-900 mb-2">{course.title}</h3>
+                  <p className="text-slate-600 text-sm mb-6 flex-1">
+                    {course.description}
+                  </p>
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-lg font-bold text-[#7c3aed]">
+                      ₹{course.price || 'Free'}
+                    </span>
+                  </div>
+                  {isLoggedIn ? (
+                    <button 
+                      onClick={() => alert(`Redirecting to secure payment checkout for ${course.title} (₹${course.price || 0})`)}
+                      className="w-full bg-[#10b981] text-white py-2.5 rounded-lg font-semibold hover:bg-[#059669] transition-colors"
+                    >
+                      Buy Now
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => {
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                        window.dispatchEvent(new Event('openRegisterModal'));
+                      }}
+                      className="w-full bg-[#7c3aed] text-white py-2.5 rounded-lg font-semibold hover:bg-[#6d28d9] transition-colors"
+                    >
+                      Enroll Now
+                    </button>
+                  )}
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-2">{course.title}</h3>
-                <p className="text-slate-600 text-sm mb-6 flex-1">
-                  {course.description}
-                </p>
-                <button className="w-full bg-[#7c3aed] text-white py-2.5 rounded-lg font-semibold hover:bg-[#6d28d9] transition-colors">
-                  Enroll Now
-                </button>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* Pagination */}
         {totalPages > 1 && (
