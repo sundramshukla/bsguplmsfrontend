@@ -20,14 +20,14 @@ const CoursesPage = () => {
     const fetchCourses = async () => {
       setLoading(true);
       try {
-        const res = await fetch('https://softwarebsguplms.pythonanywhere.com/bsgupadmin/createcourse/');
+        const res = await fetch('http://187.127.169.75/bsgupadmin/createcourse/');
         const data = await res.json();
         if (data.success && data.data) {
           const formattedCourses = data.data.map(c => ({
             id: c.id,
             title: c.title,
             description: c.description,
-            image: c.course_profile_pic ? `https://softwarebsguplms.pythonanywhere.com${c.course_profile_pic}` : "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=400&h=250&fit=crop",
+            image: c.course_profile_pic ? `http://187.127.169.75${c.course_profile_pic}` : "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=400&h=250&fit=crop",
             duration: c.duration || "4 Weeks",
             level: "Beginner", // hardcoded as fallback but can be dynamic if backend adds it
             department: DEPARTMENTS_MAP[c.department] || "Organization",

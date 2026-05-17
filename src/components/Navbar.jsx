@@ -57,7 +57,7 @@ const Navbar = () => {
     
     try {
       setIsLoading(true);
-      const res = await fetch(`https://softwarebsguplms.pythonanywhere.com/bsgupadmin/register/?mobile_number=${formData.mobile_number}&role=student`, {
+      const res = await fetch(`http://187.127.169.75/bsgupadmin/register/?mobile_number=${formData.mobile_number}&role=student`, {
         headers: {
           'Accept': 'application/json'
         }
@@ -88,7 +88,7 @@ const Navbar = () => {
 
     try {
       setIsLoading(true);
-      const res = await fetch(`https://softwarebsguplms.pythonanywhere.com/bsgupadmin/login/?mobile_number=${loginMobile}`, {
+      const res = await fetch(`http://187.127.169.75/bsgupadmin/login/?mobile_number=${loginMobile}`, {
         headers: {
           'Accept': 'application/json'
         }
@@ -123,14 +123,14 @@ const Navbar = () => {
       let payload = {};
 
       if (authType === 'register') {
-        url = `https://softwarebsguplms.pythonanywhere.com/bsgupadmin/register/?mobile_number=${formData.mobile_number}&role=student`;
+        url = `http://187.127.169.75/bsgupadmin/register/?mobile_number=${formData.mobile_number}&role=student`;
         payload = {
             mobile_number: parseInt(formData.mobile_number, 10),
             otp: parseInt(otp, 10),
             role: "student"
         };
       } else if (authType === 'login') {
-        url = `https://softwarebsguplms.pythonanywhere.com/bsgupadmin/login/?mobile_number=${loginMobile}`;
+        url = `http://187.127.169.75/bsgupadmin/login/?mobile_number=${loginMobile}`;
         payload = {
             mobile_number: parseInt(loginMobile, 10),
             otp: parseInt(otp, 10)

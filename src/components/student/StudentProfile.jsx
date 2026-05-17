@@ -17,7 +17,7 @@ const StudentProfile = () => {
   const fetchProfile = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`https://softwarebsguplms.pythonanywhere.com/bsgupadmin/profile/?user_id=${userId}`);
+      const res = await fetch(`http://187.127.169.75/bsgupadmin/profile/?user_id=${userId}`);
       const data = await res.json();
       
       if (data.data && data.data.id) {
@@ -72,7 +72,7 @@ const StudentProfile = () => {
 
     try {
       const method = isUpdating ? 'PUT' : 'POST';
-      const res = await fetch('https://softwarebsguplms.pythonanywhere.com/bsgupadmin/profile/', {
+      const res = await fetch('http://187.127.169.75/bsgupadmin/profile/', {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
