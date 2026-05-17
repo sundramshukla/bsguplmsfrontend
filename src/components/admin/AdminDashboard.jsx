@@ -3,6 +3,7 @@ import AdminCourses from './AdminCourses';
 import AdminLessons from './AdminLessons';
 import AdminProfile from './AdminProfile';
 import AdminAnalytics from './AdminAnalytics';
+import AdminQuizzes from './AdminQuizzes';
 
 const AdminDashboard = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState('analytics');
@@ -35,6 +36,12 @@ const AdminDashboard = ({ onLogout }) => {
             <span>🎥</span> Manage Lessons
           </button>
           <button 
+            onClick={() => setActiveTab('quizzes')}
+             className={`w-full text-left px-5 py-4 rounded-xl font-semibold transition-all duration-200 flex items-center gap-3 ${activeTab === 'quizzes' ? 'bg-[#7c3aed] text-white shadow-lg shadow-violet-500/30 translate-x-1' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+          >
+            <span>📝</span> Manage Quizzes
+          </button>
+          <button 
             onClick={() => setActiveTab('profile')}
              className={`w-full text-left px-5 py-4 rounded-xl font-semibold transition-all duration-200 flex items-center gap-3 ${activeTab === 'profile' ? 'bg-[#7c3aed] text-white shadow-lg shadow-violet-500/30 translate-x-1' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
           >
@@ -55,6 +62,7 @@ const AdminDashboard = ({ onLogout }) => {
             {activeTab === 'analytics' && <AdminAnalytics />}
             {activeTab === 'courses' && <AdminCourses />}
             {activeTab === 'lessons' && <AdminLessons />}
+            {activeTab === 'quizzes' && <AdminQuizzes />}
             {activeTab === 'profile' && <AdminProfile />}
         </div>
       </div>

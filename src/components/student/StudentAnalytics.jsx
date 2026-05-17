@@ -1,13 +1,33 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 const StudentAnalytics = () => {
-  const stats = {
-    coursesEnrolled: 4,
-    coursesCompleted: 1,
-    hoursLearned: 32,
-    certificatesEarned: 1,
-    averageScore: '85%'
-  };
+  const [stats, setStats] = useState({
+    coursesEnrolled: 0,
+    coursesCompleted: 0,
+    certificatesEarned: 0,
+  });
+
+  useEffect(() => {
+    const userId = localStorage.getItem('userId') || 'guest';
+    
+    // 1. Get enrolled count
+    const enrolledKey = `enrolledCourses_${userId}`;
+    const enrolledList = JSON.parse(localStorage.getItem(enrolledKey) || '[]');
+    
+    // 2. Get completed count
+    const completedKey = `completedCourses_${userId}`;
+    const completedList = JSON.parse(localStorage.getItem(completedKey) || '[]');
+    
+    // 3. Get certificates count
+    const certKey = `earnedCertificates_${userId}`;
+    const certList = JSON.parse(localStorage.getItem(certKey) || '[]');
+
+    setStats({
+      coursesEnrolled: enrolledList.length,
+      coursesCompleted: completedList.length,
+      certificatesEarned: certList.length
+    });
+  }, []);
 
   return (
     <div className="p-6">
@@ -38,32 +58,12 @@ const StudentAnalytics = () => {
         </div>
 
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-4 hover:shadow-md transition-shadow">
-          <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center text-2xl">
-            ⏱️
-          </div>
-          <div>
-            <p className="text-sm font-medium text-slate-500">Hours Learned</p>
-            <h3 className="text-2xl font-bold text-slate-800">{stats.hoursLearned} h</h3>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-4 hover:shadow-md transition-shadow">
           <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center text-2xl">
             🏆
           </div>
           <div>
             <p className="text-sm font-medium text-slate-500">Certificates Earned</p>
             <h3 className="text-2xl font-bold text-slate-800">{stats.certificatesEarned}</h3>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-4 hover:shadow-md transition-shadow">
-          <div className="w-14 h-14 bg-pink-100 text-pink-600 rounded-xl flex items-center justify-center text-2xl">
-            📈
-          </div>
-          <div>
-            <p className="text-sm font-medium text-slate-500">Average Score</p>
-            <h3 className="text-2xl font-bold text-slate-800">{stats.averageScore}</h3>
           </div>
         </div>
       </div>

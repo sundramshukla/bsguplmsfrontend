@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import Navbar from './Navbar';
 import Footer from './Footer';
 import { BASE_URL } from '../config';
+import EnrollWithoutLoginModal from './EnrollWithoutLoginModal';
 
 const DEPARTMENTS_MAP = {
   organisation: 'Organization',
@@ -15,6 +16,8 @@ const CoursesPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [activeFilter, setActiveFilter] = useState('All');
   const [isLoggedIn, setIsLoggedIn] = useState(localStorage.getItem('isLoggedIn') === 'true');
+  const [enrollModalOpen, setEnrollModalOpen] = useState(false);
+  const [selectedCourseId, setSelectedCourseId] = useState(null);
   const cardsPerPage = 6;
 
   useEffect(() => {
@@ -162,7 +165,8 @@ const CoursesPage = () => {
                     <button 
                       onClick={() => {
                         window.scrollTo({ top: 0, behavior: 'smooth' });
-                        window.dispatchEvent(new Event('openRegisterModal'));
+                        setSelectedCourseId(course.id);
+                        setEnrollModalOpen(true);
                       }}
                       className="w-full bg-[#7c3aed] text-white py-2.5 rounded-lg font-semibold hover:bg-[#6d28d9] transition-colors"
                     >
@@ -218,6 +222,11 @@ const CoursesPage = () => {
           </div>
         )}
       </div>
+      <EnrollWithoutLoginModal 
+        isOpen={enrollModalOpen} 
+        onClose={() => setEnrollModalOpen(false)} 
+        courseId={selectedCourseId} 
+      />
     </div>
   );
 };

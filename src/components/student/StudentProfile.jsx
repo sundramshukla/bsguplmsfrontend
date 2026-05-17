@@ -7,8 +7,7 @@ const StudentProfile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   
-  // Hardcoded for demo, normally from auth context
-  const userId = 2; 
+  const userId = localStorage.getItem('userId') || 1; 
 
   const [formData, setFormData] = useState({
     full_name: '', email: '', date_of_birth: '', gender: '',
@@ -20,18 +19,26 @@ const StudentProfile = () => {
     try {
       const res = await fetch(`${BASE_URL}/bsgupadmin/profile/?user_id=${userId}`);
       const data = await res.json();
+      let profileData = null;
+      if (Array.isArray(data) && data.length > 0) {
+        profileData = data[0];
+      } else if (data && data.id) {
+        profileData = data;
+      } else if (data && data.data) {
+        profileData = data.data;
+      }
       
-      if (data.data && data.data.id) {
-        setProfile(data.data);
+      if (profileData && profileData.id) {
+        setProfile(profileData);
         setFormData({
-          full_name: data.data.full_name || '',
-          email: data.data.email || '',
-          date_of_birth: data.data.date_of_birth || '',
-          gender: data.data.gender || '',
-          address: data.data.address || '',
-          city: data.data.city || '',
-          state: data.data.state || '',
-          pincode: data.data.pincode || ''
+          full_name: profileData.full_name || '',
+          email: profileData.email || '',
+          date_of_birth: profileData.date_of_birth || '',
+          gender: profileData.gender || '',
+          address: profileData.address || '',
+          city: profileData.city || '',
+          state: profileData.state || '',
+          pincode: profileData.pincode || ''
         });
         setIsEditing(false);
       } else {
@@ -60,7 +67,7 @@ const StudentProfile = () => {
     const isUpdating = profile !== null;
 
     const payload = {
-      user: userId,
+      user: parseInt(userId, 10),
       full_name: formData.full_name,
       email: formData.email,
       date_of_birth: formData.date_of_birth,

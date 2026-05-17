@@ -13,7 +13,7 @@ const AdminCourses = () => {
     priceAmount: '', priceCurrency: '₹', isFree: false,
     durationValue: '', durationUnit: 'months', 
     durationHours: '', durationMinutes: '', durationSeconds: '',
-    department: 'training', user: '1'
+    department: 'training', user: ''
   });
   const [file, setFile] = useState(null);
 
@@ -87,12 +87,12 @@ const AdminCourses = () => {
         department: course.department 
           ? course.department.toLowerCase() 
           : 'training', // standardize to backend choices
-        user: course.user || '1'
+        user: course.user || ''
       });
     } else {
       setEditingCourse(null);
       setFormData({
-        title: '', description: '', priceAmount: '', priceCurrency: '₹', isFree: false, durationValue: '', durationUnit: 'months', durationHours: '', durationMinutes: '', durationSeconds: '', department: 'training', user: '1'
+        title: '', description: '', priceAmount: '', priceCurrency: '₹', isFree: false, durationValue: '', durationUnit: 'months', durationHours: '', durationMinutes: '', durationSeconds: '', department: 'training', user: ''
       });
     }
     setFile(null);
@@ -123,7 +123,8 @@ const AdminCourses = () => {
     fd.append('duration', finalDuration);
     
     fd.append('department', formData.department);
-    fd.append('user', formData.user);
+    const userId = localStorage.getItem('adminUserId') || formData.user || '1';
+    fd.append('user', userId);
     
     if (isEditing) {
       fd.append('course_id', editingCourse.id);

@@ -25,7 +25,7 @@ const Hero = () => {
 
         <div className="hero-buttons">
           <button className="btn-primary large" onClick={() => window.location.hash = '#courses'}>Explore Courses</button>
-          <button className="btn-secondary large">View sundram Catalog</button>
+          <button className="btn-secondary large">View Catalog</button>
         </div>
       </div>
     </section>

@@ -20,6 +20,10 @@ const StudentPanel = () => {
   const handleLogout = () => {
     setIsLoggedIn(false);
     localStorage.removeItem('isStudentLoggedIn');
+    localStorage.removeItem('isLoggedIn');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('token');
+    window.dispatchEvent(new Event('authChange'));
     window.location.hash = '#';
   };
 

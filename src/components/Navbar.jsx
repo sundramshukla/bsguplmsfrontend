@@ -13,15 +13,28 @@ const Navbar = () => {
   
   // OTP flow states
   const [otpMode, setOtpMode] = useState(false);
+  const [profileMode, setProfileMode] = useState(false);
   const [otp, setOtp] = useState('');
   const [authType, setAuthType] = useState(''); // 'register' or 'login'
   const [isLoading, setIsLoading] = useState(false);
+
+  const [profileData, setProfileData] = useState({
+    full_name: '',
+    email: '',
+    date_of_birth: '',
+    gender: 'male',
+    address: '',
+    city: '',
+    state: '',
+    pincode: ''
+  });
 
   useEffect(() => {
     const handleEvent = () => {
       setIsRegisterOpen(true);
       setIsLoginOpen(false);
       setOtpMode(false);
+      setProfileMode(false);
       setOtp('');
       setFormData({ name: '', email: '', mobile_number: '' });
     };
@@ -29,14 +42,57 @@ const Navbar = () => {
     return () => window.removeEventListener('openRegisterModal', handleEvent);
   }, []);
 
+  useEffect(() => {
+    const handleAuthChange = () => {
+      const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
+      setIsLoggedIn(loggedIn);
+      if (!loggedIn) {
+        setFormData({ name: '', email: '', mobile_number: '' });
+      } else {
+        const fetchProfileName = async () => {
+          try {
+            const userId = localStorage.getItem('userId');
+            if (userId) {
+              const res = await fetch(`${BASE_URL}/bsgupadmin/profile/?user_id=${userId}`);
+              const data = await res.json();
+              let profile = null;
+              if (Array.isArray(data) && data.length > 0) profile = data[0];
+              else if (data && data.full_name) profile = data;
+              else if (data && data.data) profile = data.data;
+
+              if (profile && profile.full_name) {
+                setFormData(prev => ({ ...prev, name: profile.full_name }));
+              }
+            }
+          } catch (err) {
+            console.error(err);
+          }
+        };
+        fetchProfileName();
+      }
+    };
+
+    window.addEventListener('authChange', handleAuthChange);
+    handleAuthChange(); // run initially
+
+    return () => {
+      window.removeEventListener('authChange', handleAuthChange);
+    };
+  }, []);
+
   const handleFormChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleProfileChange = (e) => {
+    setProfileData({ ...profileData, [e.target.name]: e.target.value });
   };
 
   const openRegister = () => {
     setIsRegisterOpen(true);
     setIsLoginOpen(false);
     setOtpMode(false);
+    setProfileMode(false);
     setOtp('');
     setFormData({ name: '', email: '', mobile_number: '' });
   };
@@ -45,14 +101,15 @@ const Navbar = () => {
     setIsLoginOpen(true);
     setIsRegisterOpen(false);
     setOtpMode(false);
+    setProfileMode(false);
     setOtp('');
     setLoginMobile('');
   };
 
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.email || !formData.mobile_number) {
-      alert('Please fill all fields.');
+    if (!formData.mobile_number) {
+      alert('Please provide mobile number.');
       return;
     }
     
@@ -148,24 +205,169 @@ const Navbar = () => {
 
       if (res.ok) {
         // success
-        setIsLoggedIn(true);
-        localStorage.setItem('isLoggedIn', 'true');
-        localStorage.setItem('isStudentLoggedIn', 'true');
-        window.dispatchEvent(new Event('authChange'));
-        if (authType === 'login' && !formData.name) {
-          // just a fallback if name is not set
-          setFormData(prev => ({ ...prev, name: 'Student' }));
+        const data = await res.json().catch(() => ({}));
+        
+        // Helper to extract JWT token deeply from response
+        const extractToken = (obj) => {
+           if (typeof obj === 'string' && obj.startsWith('eyJ')) return obj;
+           if (typeof obj === 'object' && obj !== null) {
+              if (obj.access && typeof obj.access === 'string') return obj.access;
+              if (obj.token && typeof obj.token === 'string') return obj.token;
+              for (const key in obj) {
+                 if (typeof obj[key] === 'string' && obj[key].startsWith('eyJ')) return obj[key];
+                 if (typeof obj[key] === 'object') {
+                    const nested = extractToken(obj[key]);
+                    if (nested) return nested;
+                 }
+              }
+           }
+           return null;
+        };
+
+        const parseJwt = (t) => {
+           try { return JSON.parse(atob(t.split('.')[1])); } catch (e) { return null; }
+        };
+
+        const token = extractToken(data);
+        let returnedUserId = null;
+        
+        if (token) {
+           localStorage.setItem('token', token);
+           const decoded = parseJwt(token);
+           if (decoded) {
+              returnedUserId = decoded.user_id || decoded.id || decoded.user;
+           }
         }
-        setIsRegisterOpen(false);
-        setIsLoginOpen(false);
-        setOtpMode(false);
-        window.location.hash = '#student';
+
+        if (!returnedUserId) {
+          if (data) {
+            returnedUserId = data.user_id || data.id || data.user || data.userId;
+            if (!returnedUserId && data.data) {
+               returnedUserId = data.data.user_id || data.data.id || data.data.user;
+            }
+            if (!returnedUserId && data.user_details) {
+               returnedUserId = data.user_details.id || data.user_details.user_id;
+            }
+          }
+        }
+        
+        if (returnedUserId) {
+           localStorage.setItem('userId', returnedUserId);
+        } else {
+           console.warn("Could not find user ID in response or token:", data);
+        }
+
+        // Check if student is already fully registered with a profile
+        if (authType === 'login') {
+           let profileExists = false;
+           let profileName = '';
+           if (returnedUserId) {
+             try {
+               const pRes = await fetch(`${BASE_URL}/bsgupadmin/profile/?user_id=${returnedUserId}`);
+               if (pRes.ok) {
+                 const pData = await pRes.json();
+                 let profileObj = null;
+                 if (Array.isArray(pData) && pData.length > 0) profileObj = pData[0];
+                 else if (pData && pData.full_name) profileObj = pData;
+                 else if (pData && pData.data) profileObj = pData.data;
+
+                 if (profileObj && profileObj.full_name) {
+                   profileExists = true;
+                   profileName = profileObj.full_name;
+                 }
+               }
+             } catch (err) {
+               console.error("Profile check failed:", err);
+             }
+           }
+
+           if (profileExists) {
+             // Profile exists: log in directly to portal
+             setIsLoggedIn(true);
+             localStorage.setItem('isLoggedIn', 'true');
+             localStorage.setItem('isStudentLoggedIn', 'true');
+             if (profileName) {
+               setFormData(prev => ({ ...prev, name: profileName }));
+             }
+             window.dispatchEvent(new Event('authChange'));
+             setIsRegisterOpen(false);
+             setIsLoginOpen(false);
+             setOtpMode(false);
+             setProfileMode(false);
+             window.location.hash = '#student';
+           } else {
+             // No profile: show Complete Profile form
+             setOtpMode(false);
+             setProfileMode(true);
+             setIsLoginOpen(false);
+             setIsRegisterOpen(true);
+           }
+        } else if (authType === 'register') {
+           setIsRegisterOpen(false);
+           setOtpMode(false);
+           setIsLoginOpen(true);
+           alert("Registration successful! Please login with your mobile number to continue.");
+        } else {
+           // Fallback if authType is somehow missing
+           setIsLoggedIn(true);
+           localStorage.setItem('isLoggedIn', 'true');
+           localStorage.setItem('isStudentLoggedIn', 'true');
+           window.dispatchEvent(new Event('authChange'));
+           if (!formData.name && data && data.full_name) {
+             setFormData(prev => ({ ...prev, name: data.full_name }));
+           }
+           setIsRegisterOpen(false);
+           setIsLoginOpen(false);
+           setOtpMode(false);
+           window.location.hash = '#student';
+        }
       } else {
         alert("Invalid OTP or error occurred.");
       }
     } catch (err) {
       console.error(err);
       alert("Error verifying OTP");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleProfileSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      setIsLoading(true);
+      const userId = localStorage.getItem('userId') || 1;
+      const payload = {
+        user: parseInt(userId, 10),
+        ...profileData
+      };
+      
+      const res = await fetch(`${BASE_URL}/bsgupadmin/profile/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        setIsLoggedIn(true);
+        localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('isStudentLoggedIn', 'true');
+        setFormData(prev => ({ ...prev, name: profileData.full_name }));
+        window.dispatchEvent(new Event('authChange'));
+        
+        setIsRegisterOpen(false);
+        setProfileMode(false);
+        window.location.hash = '#student';
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        console.error("Profile saving error:", errorData);
+        alert("Failed to save profile. Please check the inputs.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error saving profile");
     } finally {
       setIsLoading(false);
     }
@@ -180,8 +382,6 @@ const Navbar = () => {
     setLoginMobile('');
     window.location.hash = '#';
   };
-
-  // inline component replaced
 
   return (
     <>
@@ -229,32 +429,10 @@ const Navbar = () => {
       {/* Register Modal */}
       {isRegisterOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setIsRegisterOpen(false)}>
-          <div className="bg-white p-8 rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-2xl font-bold text-slate-900 mb-4">Register for Beginner Course</h3>
-            {!otpMode ? (
+          <div className="bg-white p-8 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-2xl font-bold text-slate-900 mb-4">{profileMode ? 'Complete Your Profile' : 'Register for Beginner Course'}</h3>
+            {!otpMode && !profileMode && (
               <form onSubmit={handleRegisterSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleFormChange}
-                    className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/50 focus:border-[#7c3aed]"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleFormChange}
-                    className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/50 focus:border-[#7c3aed]"
-                    required
-                  />
-                </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Mobile Number</label>
                   <input
@@ -271,10 +449,12 @@ const Navbar = () => {
                   disabled={isLoading}
                   className="w-full bg-[#7c3aed] text-white py-3 rounded-lg font-semibold hover:bg-[#6d28d9] transition-colors disabled:opacity-70"
                 >
-                  {isLoading ? 'Sending OTP...' : 'Start Training & Get OTP'}
+                  {isLoading ? 'Sending OTP...' : 'Get OTP'}
                 </button>
               </form>
-            ) : (
+            )}
+            
+            {otpMode && !profileMode && (
               <form onSubmit={handleOtpSubmit} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Enter OTP sent to {formData.mobile_number}</label>
@@ -296,7 +476,57 @@ const Navbar = () => {
                   disabled={isLoading}
                   className="w-full bg-[#7c3aed] text-white py-3 rounded-lg font-semibold hover:bg-[#6d28d9] transition-colors disabled:opacity-70"
                 >
-                  {isLoading ? 'Verifying...' : 'Verify OTP & Register'}
+                  {isLoading ? 'Verifying...' : 'Verify OTP & Continue'}
+                </button>
+              </form>
+            )}
+
+            {profileMode && (
+              <form onSubmit={handleProfileSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
+                    <input type="text" name="full_name" value={profileData.full_name} onChange={handleProfileChange} className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7c3aed]" required />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                    <input type="email" name="email" value={profileData.email} onChange={handleProfileChange} className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7c3aed]" required />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Date of Birth</label>
+                    <input type="date" name="date_of_birth" value={profileData.date_of_birth} onChange={handleProfileChange} className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7c3aed]" required />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Gender</label>
+                    <select name="gender" value={profileData.gender} onChange={handleProfileChange} className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7c3aed]" required>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Address</label>
+                    <input type="text" name="address" value={profileData.address} onChange={handleProfileChange} className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7c3aed]" required />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">City</label>
+                    <input type="text" name="city" value={profileData.city} onChange={handleProfileChange} className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7c3aed]" required />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">State</label>
+                    <input type="text" name="state" value={profileData.state} onChange={handleProfileChange} className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7c3aed]" required />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Pincode</label>
+                    <input type="text" name="pincode" value={profileData.pincode} onChange={handleProfileChange} className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7c3aed]" required />
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full mt-4 bg-[#7c3aed] text-white py-3 rounded-lg font-semibold hover:bg-[#6d28d9] transition-colors disabled:opacity-70"
+                >
+                  {isLoading ? 'Saving Profile...' : 'Complete Registration'}
                 </button>
               </form>
             )}
