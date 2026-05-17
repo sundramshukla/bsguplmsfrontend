@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BASE_URL } from '../../config';
 
 const AdminCourses = () => {
   const [courses, setCourses] = useState([]);
@@ -19,7 +20,7 @@ const AdminCourses = () => {
   const fetchCourses = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://187.127.169.75/bsgupadmin/createcourse/');
+      const res = await fetch(`${BASE_URL}/bsgupadmin/createcourse/`);
       const data = await res.json();
       if (data.success && data.data) {
         setCourses(data.data);
@@ -133,7 +134,7 @@ const AdminCourses = () => {
     }
 
     try {
-      const url = 'http://187.127.169.75/bsgupadmin/createcourse/';
+      const url = `${BASE_URL}/bsgupadmin/createcourse/`;
       const method = isEditing ? 'PUT' : 'POST';
       
       const res = await fetch(url, { method, body: fd });
@@ -154,7 +155,7 @@ const AdminCourses = () => {
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this course?")) return;
     try {
-      const res = await fetch(`http://187.127.169.75/bsgupadmin/createcourse/?course_id=${id}`, {
+      const res = await fetch(`${BASE_URL}/bsgupadmin/createcourse/?course_id=${id}`, {
         method: 'DELETE'
       });
       const data = await res.json();
@@ -274,7 +275,7 @@ const AdminCourses = () => {
           {courses.map(course => (
             <div key={course.id} className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-shadow duration-300 overflow-hidden flex flex-col border border-slate-200 group">
               {course.course_profile_pic ? (
-                <img src={`http://187.127.169.75${course.course_profile_pic}`} alt={course.title} className="w-full h-44 object-cover" />
+                <img src={`${BASE_URL}${course.course_profile_pic}`} alt={course.title} className="w-full h-44 object-cover" />
               ) : (
                 <div className="w-full h-44 bg-slate-200 flex items-center justify-center text-slate-400">No Image provided</div>
               )}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import "../CSS/style.css";
+import { BASE_URL } from '../config';
 
 const Navbar = () => {
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
@@ -57,7 +58,7 @@ const Navbar = () => {
     
     try {
       setIsLoading(true);
-      const res = await fetch(`http://187.127.169.75/bsgupadmin/register/?mobile_number=${formData.mobile_number}&role=student`, {
+      const res = await fetch(`${BASE_URL}/bsgupadmin/register/?mobile_number=${formData.mobile_number}&role=student`, {
         headers: {
           'Accept': 'application/json'
         }
@@ -88,7 +89,7 @@ const Navbar = () => {
 
     try {
       setIsLoading(true);
-      const res = await fetch(`http://187.127.169.75/bsgupadmin/login/?mobile_number=${loginMobile}`, {
+      const res = await fetch(`${BASE_URL}/bsgupadmin/login/?mobile_number=${loginMobile}`, {
         headers: {
           'Accept': 'application/json'
         }
@@ -123,14 +124,14 @@ const Navbar = () => {
       let payload = {};
 
       if (authType === 'register') {
-        url = `http://187.127.169.75/bsgupadmin/register/?mobile_number=${formData.mobile_number}&role=student`;
+        url = `${BASE_URL}/bsgupadmin/register/?mobile_number=${formData.mobile_number}&role=student`;
         payload = {
             mobile_number: parseInt(formData.mobile_number, 10),
             otp: parseInt(otp, 10),
             role: "student"
         };
       } else if (authType === 'login') {
-        url = `http://187.127.169.75/bsgupadmin/login/?mobile_number=${loginMobile}`;
+        url = `${BASE_URL}/bsgupadmin/login/?mobile_number=${loginMobile}`;
         payload = {
             mobile_number: parseInt(loginMobile, 10),
             otp: parseInt(otp, 10)

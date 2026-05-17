@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BASE_URL } from '../../config';
 
 const AdminProfile = () => {
   const [profile, setProfile] = useState(null);
@@ -21,7 +22,7 @@ const AdminProfile = () => {
   const fetchProfile = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`http://187.127.169.75/bsgupadmin/profile/?user_id=${userId}`);
+      const res = await fetch(`${BASE_URL}/bsgupadmin/profile/?user_id=${userId}`);
       const data = await res.json();
       
       // If profile exists
@@ -79,7 +80,7 @@ const AdminProfile = () => {
 
     try {
       const method = isUpdating ? 'PUT' : 'POST';
-      const res = await fetch('http://187.127.169.75/bsgupadmin/profile/', {
+      const res = await fetch(`${BASE_URL}/bsgupadmin/profile/`, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

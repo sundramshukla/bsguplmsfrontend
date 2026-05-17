@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BASE_URL } from '../../config';
 
 const StudentProfile = () => {
   const [profile, setProfile] = useState(null);
@@ -17,7 +18,7 @@ const StudentProfile = () => {
   const fetchProfile = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`http://187.127.169.75/bsgupadmin/profile/?user_id=${userId}`);
+      const res = await fetch(`${BASE_URL}/bsgupadmin/profile/?user_id=${userId}`);
       const data = await res.json();
       
       if (data.data && data.data.id) {
@@ -72,7 +73,7 @@ const StudentProfile = () => {
 
     try {
       const method = isUpdating ? 'PUT' : 'POST';
-      const res = await fetch('http://187.127.169.75/bsgupadmin/profile/', {
+      const res = await fetch(`${BASE_URL}/bsgupadmin/profile/`, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

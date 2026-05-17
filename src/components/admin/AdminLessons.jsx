@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BASE_URL } from '../../config';
 
 const AdminLessons = () => {
   const [courses, setCourses] = useState([]);
@@ -16,7 +17,7 @@ const AdminLessons = () => {
   useEffect(() => {
     const fetchCourses = async () => {
       try {
-        const res = await fetch('http://187.127.169.75/bsgupadmin/createcourse/');
+        const res = await fetch(`${BASE_URL}/bsgupadmin/createcourse/`);
         const data = await res.json();
         if (data.success && data.data) {
           setCourses(data.data);
@@ -40,7 +41,7 @@ const AdminLessons = () => {
   const fetchLessons = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`http://187.127.169.75/bsgupadmin/create-lesson/?course_id=${selectedCourseId}`);
+      const res = await fetch(`${BASE_URL}/bsgupadmin/create-lesson/?course_id=${selectedCourseId}`);
       const data = await res.json();
       if (data.success && data.data) {
         setLessons(data.data);
@@ -113,7 +114,7 @@ const AdminLessons = () => {
 
     try {
       const method = isEditing ? 'PUT' : 'POST';
-      const res = await fetch('http://187.127.169.75/bsgupadmin/create-lesson/', {
+      const res = await fetch(`${BASE_URL}/bsgupadmin/create-lesson/`, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -135,7 +136,7 @@ const AdminLessons = () => {
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this lesson?")) return;
     try {
-      const res = await fetch(`http://187.127.169.75/bsgupadmin/create-lesson/?lesson_id=${id}`, {
+      const res = await fetch(`${BASE_URL}/bsgupadmin/create-lesson/?lesson_id=${id}`, {
         method: 'DELETE'
       });
       const data = await res.json();

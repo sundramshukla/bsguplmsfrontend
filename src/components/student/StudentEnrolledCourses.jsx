@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BASE_URL } from '../../config';
 
 const StudentEnrolledCourses = () => {
   const [courses, setCourses] = useState([]);
@@ -9,7 +10,7 @@ const StudentEnrolledCourses = () => {
     // In a real app, there would be an endpoint like /student/enrolled-courses
     const fetchCourses = async () => {
       try {
-        const res = await fetch('http://187.127.169.75/bsgupadmin/createcourse/');
+        const res = await fetch(`${BASE_URL}/bsgupadmin/createcourse/`);
         const data = await res.json();
         if (data.success && data.data) {
           // just slice first 2 for dummy
@@ -40,7 +41,7 @@ const StudentEnrolledCourses = () => {
           {courses.map(course => (
             <div key={course.id} className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-shadow duration-300 overflow-hidden flex flex-col border border-slate-200">
               {course.course_profile_pic ? (
-                <img src={`http://187.127.169.75${course.course_profile_pic}`} alt={course.title} className="w-full h-48 object-cover" />
+                <img src={`${BASE_URL}${course.course_profile_pic}`} alt={course.title} className="w-full h-48 object-cover" />
               ) : (
                 <div className="w-full h-48 bg-slate-200 flex items-center justify-center text-slate-400">No Image provided</div>
               )}
