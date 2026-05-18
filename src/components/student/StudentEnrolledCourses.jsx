@@ -118,6 +118,42 @@ const YouTubePlayer = ({ url, title, courseId, partNum, onVideoEnd }) => {
   );
 };
 
+const parseQuizResponse = (data) => {
+  if (!data) return null;
+  
+  // Format C: { quiz: { title, ... }, questions: [...] }
+  if (data.quiz && data.questions) {
+    return {
+      title: data.quiz.title || "Course Final Quiz",
+      passing_marks: data.quiz.passing_marks || data.quiz.passing_mark || 60,
+      duration: data.quiz.duration || 30,
+      questions: data.questions
+    };
+  }
+  
+  // Format B: { success: true, data: { title, questions, ... } }
+  if (data.data && (data.data.title || data.data.questions)) {
+    return {
+      title: data.data.title || "Course Final Quiz",
+      passing_marks: data.data.passing_marks || data.data.passing_mark || 60,
+      duration: data.data.duration || 30,
+      questions: data.data.questions || []
+    };
+  }
+  
+  // Format A: { title, questions, ... } directly at root
+  if (data.title || data.questions) {
+    return {
+      title: data.title || "Course Final Quiz",
+      passing_marks: data.passing_marks || data.passing_mark || 60,
+      duration: data.duration || 30,
+      questions: data.questions || []
+    };
+  }
+  
+  return null;
+};
+
 const StudentEnrolledCourses = () => {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -265,15 +301,23 @@ const StudentEnrolledCourses = () => {
       // Trying to fetch quiz with dynamic ID
       const res = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?quiz_id=${cachedQuizId}`);
       if (res.ok) {
-        const data = await res.json();
-        const quizObj = data.title ? data : (data.data || {});
-        setQuizData(quizObj);
+        const rawData = await res.json();
+        const quizObj = parseQuizResponse(rawData);
+        if (quizObj && quizObj.questions && quizObj.questions.length > 0) {
+          setQuizData(quizObj);
+        } else {
+          setQuizData(fallbackQuiz);
+        }
       } else {
         const fallbackRes = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?quiz_id=${activeCourse.id}`);
         if (fallbackRes.ok) {
-          const data = await fallbackRes.json();
-          const quizObj = data.title ? data : (data.data || {});
-          setQuizData(quizObj);
+          const rawData = await fallbackRes.json();
+          const quizObj = parseQuizResponse(rawData);
+          if (quizObj && quizObj.questions && quizObj.questions.length > 0) {
+            setQuizData(quizObj);
+          } else {
+            setQuizData(fallbackQuiz);
+          }
         } else {
           setQuizData(fallbackQuiz);
         }
