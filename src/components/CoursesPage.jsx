@@ -80,6 +80,51 @@ const CoursesPage = () => {
     setCurrentPage(page);
   };
 
+  const handleLoggedInEnroll = (course) => {
+    const userId = localStorage.getItem('userId') || '3';
+    const key = `enrolledCourses_${userId}`;
+    const enrolledStr = localStorage.getItem(key) || '[]';
+    const enrolled = JSON.parse(enrolledStr);
+
+    if (enrolled.includes(course.id)) {
+      alert("You are already enrolled in this course!");
+      window.location.hash = '#student';
+      return;
+    }
+
+    const isFree = course.price == 0 || course.price == '0' || course.price == '0.00';
+
+    if (isFree) {
+      enrolled.push(course.id);
+      localStorage.setItem(key, JSON.stringify(enrolled));
+      alert(`Successfully enrolled in "${course.title}" for Free! You can now start learning.`);
+      window.location.hash = '#student';
+      window.dispatchEvent(new Event('storage'));
+    } else {
+      const confirmPayment = window.confirm(`Proceed to secure payment of ₹${course.price} to enroll in "${course.title}"?`);
+      if (confirmPayment) {
+        enrolled.push(course.id);
+        localStorage.setItem(key, JSON.stringify(enrolled));
+        
+        // Track payment history
+        const paymentKey = `paymentHistory_${userId}`;
+        const paymentHistory = JSON.parse(localStorage.getItem(paymentKey) || '[]');
+        paymentHistory.push({
+          id: Date.now(),
+          courseTitle: course.title,
+          amount: course.price,
+          date: new Date().toLocaleDateString(),
+          status: 'Success'
+        });
+        localStorage.setItem(paymentKey, JSON.stringify(paymentHistory));
+
+        alert(`Payment of ₹${course.price} Successful! You are now enrolled in "${course.title}".`);
+        window.location.hash = '#student';
+        window.dispatchEvent(new Event('storage'));
+      }
+    }
+  };
+
   return (
     <div className="pt-8 pb-16 min-h-screen bg-slate-50">
       <div className="container mx-auto px-4">
@@ -154,9 +199,7 @@ const CoursesPage = () => {
                   </div>
                   {isLoggedIn ? (
                     <button 
-                      onClick={() => {
-                        window.location.hash = '#student';
-                      }}
+                      onClick={() => handleLoggedInEnroll(course)}
                       className="w-full bg-[#10b981] text-white py-2.5 rounded-lg font-semibold hover:bg-[#059669] transition-colors"
                     >
                       {course.price == 0 || course.price == '0' || course.price == '0.00' ? 'Start Free Course' : 'Enroll & Pay'}
