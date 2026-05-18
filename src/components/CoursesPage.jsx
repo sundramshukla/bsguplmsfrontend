@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import Navbar from './Navbar';
 import Footer from './Footer';
 import { BASE_URL } from '../config';
-import EnrollWithoutLoginModal from './EnrollWithoutLoginModal';
 import Loader from './Loader';
 
 const DEPARTMENTS_MAP = {
@@ -207,12 +206,12 @@ const CoursesPage = () => {
                     <button 
                       onClick={() => {
                         window.scrollTo({ top: 0, behavior: 'smooth' });
-                        setSelectedCourseId(course.id);
-                        setEnrollModalOpen(true);
+                        alert("Please sign up or log in to enroll in this course!");
+                        window.dispatchEvent(new Event('openRegisterModal'));
                       }}
-                      className="w-full bg-[#7c3aed] text-white py-2.5 rounded-lg font-semibold hover:bg-[#6d28d9] transition-colors"
+                      className="w-full bg-[#7c3aed] text-white py-2.5 rounded-lg font-semibold hover:bg-[#6d28d9] transition-all hover:scale-[1.02] shadow-md shadow-purple-500/10 active:scale-95"
                     >
-                      Enroll Now
+                      Sign Up & Enroll
                     </button>
                   )}
                 </div>
@@ -264,11 +263,6 @@ const CoursesPage = () => {
           </div>
         )}
       </div>
-      <EnrollWithoutLoginModal 
-        isOpen={enrollModalOpen} 
-        onClose={() => setEnrollModalOpen(false)} 
-        courseId={selectedCourseId} 
-      />
     </div>
   );
 };

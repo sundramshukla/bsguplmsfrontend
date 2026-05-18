@@ -31,6 +31,7 @@ const EnrollWithoutLoginModal = ({ isOpen, onClose, courseId }) => {
       const res = await fetch(`${BASE_URL}/user/enrollwithoutlogin/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(payload)
       });
       if (res.ok) {
@@ -54,22 +55,44 @@ const EnrollWithoutLoginModal = ({ isOpen, onClose, courseId }) => {
     setIsLoading(true);
     try {
       const payload = {
-        mobile: formData.mobile,
-        course_id: courseId,
-        otp: otp
+        mobile: formData.mobile.toString(),
+        course_id: parseInt(courseId, 10),
+        otp: otp.toString()
       };
       const res = await fetch(`${BASE_URL}/user/enrollwithoutlogin/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(payload)
       });
       if (res.ok) {
+        const data = await res.json().catch(() => ({}));
         alert('Successfully enrolled!');
-        // Trigger auth state change or just close
-        // The user might be considered logged in if the backend handles it, but just closing is fine for "without login" flow.
+        
+        // Extract userId and update local enrolled courses list
+        const userId = data.user_id || data.id || localStorage.getItem('userId') || '3';
+        const key = `enrolledCourses_${userId}`;
+        const enrolled = JSON.parse(localStorage.getItem(key) || '[]');
+        if (!enrolled.includes(parseInt(courseId, 10))) {
+          enrolled.push(parseInt(courseId, 10));
+          localStorage.setItem(key, JSON.stringify(enrolled));
+        }
+
+        // Auto-login if backend returns authentication credentials
+        localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('role', 'student');
+        localStorage.setItem('userId', userId);
+        if (data.token || data.jwt || data.access) {
+          localStorage.setItem('token', data.token || data.jwt || data.access);
+        }
+        window.dispatchEvent(new Event('authChange'));
+        
+        window.dispatchEvent(new Event('storage'));
         onClose();
-        // optionally reload or reset form
         setStep(1);
+        
+        // Redirect to student panel immediately
+        window.location.hash = '#student';
       } else {
         alert('Invalid OTP. Please try again.');
       }

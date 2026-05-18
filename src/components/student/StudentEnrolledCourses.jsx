@@ -523,9 +523,11 @@ const StudentEnrolledCourses = () => {
 
       let finalScorePercentage = 0;
       let passed = false;
+      let backendMessage = "";
 
       if (res.ok) {
         const resultData = await res.json();
+        backendMessage = resultData.message || (resultData.data && resultData.data.message) || "";
         if (resultData && resultData.success && resultData.data) {
           finalScorePercentage = Math.round(resultData.data.percentage);
           passed = resultData.data.passed === true || resultData.data.passed === "true";
@@ -554,7 +556,8 @@ const StudentEnrolledCourses = () => {
 
       setQuizResult({
         score: finalScorePercentage,
-        passed: passed
+        passed: passed,
+        message: backendMessage
       });
 
       if (passed) {
@@ -571,10 +574,6 @@ const StudentEnrolledCourses = () => {
           certList.push(activeCourse.id);
           localStorage.setItem(certKey, JSON.stringify(certList));
         }
-
-        // Trigger WhatsApp Dispatch
-        alert("Exam Passed! Generating your verified Certificate and sending it directly to your WhatsApp...");
-        setShowCertificate(true);
       }
 
     } catch (err) {
@@ -726,37 +725,44 @@ const StudentEnrolledCourses = () => {
                   <div className="py-8 text-center space-y-6">
                     <div className="text-7xl">{quizResult.passed ? '🎉' : '❌'}</div>
                     <h4 className="text-2xl font-extrabold text-slate-800">
-                      {quizResult.passed ? 'Congratulations! You Passed' : 'Verification Failed'}
+                      {quizResult.passed ? 'Quiz Completed Successfully' : 'Quiz Failed'}
                     </h4>
-                    <p className="text-slate-600 text-lg">
-                      Your Score: <span className="font-bold text-emerald-500">{quizResult.score}%</span> (Passing Mark: {quizData.passing_marks || 60}%)
-                    </p>
-
-                    {quizResult.passed ? (
-                      <div className="space-y-4">
-                        <div className="bg-emerald-50 text-emerald-700 p-4 rounded-xl max-w-lg mx-auto border border-emerald-100 font-medium">
-                          A digital certificate featuring your dynamic QR Code has been securely dispatched to your registered WhatsApp number!
-                        </div>
-                        <button 
-                          onClick={() => setShowCertificate(true)}
-                          className="bg-[#7c3aed] text-white font-bold px-8 py-3 rounded-xl hover:bg-[#6d28d9] transition-colors"
-                        >
-                          View Certificate
-                        </button>
+                    
+                    <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 max-w-lg mx-auto space-y-4 text-left">
+                      <div>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Exam Performance</span>
+                        <p className="text-2xl font-black text-slate-800 mt-1">
+                          Score Secured: <span className="text-emerald-500">{quizResult.score}%</span>
+                        </p>
+                        <p className="text-xs font-bold text-slate-500 mt-1">Passing requirement is {quizData.passing_marks || 60}%</p>
                       </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <div className="bg-rose-50 text-rose-700 p-4 rounded-xl max-w-lg mx-auto border border-rose-100 font-medium">
-                          Unfortunately, you did not secure the passing percentage. Don't worry, you can study the materials and re-attempt the quiz anytime.
+                      
+                      {quizResult.message && (
+                        <div className="border-t border-slate-200 pt-4">
+                          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Status Response</span>
+                          <p className="text-sm font-semibold text-slate-700 mt-1">
+                            {quizResult.message}
+                          </p>
                         </div>
+                      )}
+                    </div>
+
+                    <div className="pt-4 flex justify-center gap-3">
+                      {!quizResult.passed && (
                         <button 
                           onClick={() => { setQuizResult(null); setSelectedAnswers({}); }}
-                          className="bg-emerald-500 text-white font-bold px-8 py-3 rounded-xl hover:bg-emerald-600 transition-colors"
+                          className="bg-emerald-500 text-white font-extrabold px-8 py-3 rounded-xl hover:bg-emerald-600 transition-colors text-sm shadow-md shadow-emerald-500/10"
                         >
                           Try Again
                         </button>
-                      </div>
-                    )}
+                      )}
+                      <button 
+                        onClick={resetStudyPanel}
+                        className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-8 py-3 rounded-xl transition-all text-sm"
+                      >
+                        Back to Courses
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   // Active Questions List
