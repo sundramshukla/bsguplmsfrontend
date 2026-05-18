@@ -20,6 +20,12 @@ const AdminPanel = () => {
   const handleLogout = () => {
     setIsLoggedIn(false);
     localStorage.removeItem('isAdminLoggedIn');
+    localStorage.removeItem('token');
+    localStorage.removeItem('isLoggedIn');
+    localStorage.removeItem('isStudentLoggedIn');
+    localStorage.removeItem('adminToken');
+    window.location.hash = '';
+    window.location.reload();
   };
 
   if (isLoggedIn) {

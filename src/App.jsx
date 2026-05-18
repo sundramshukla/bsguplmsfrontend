@@ -12,6 +12,7 @@ import StudentPanel from './components/student/StudentPanel.jsx'
 
 function App() {
   const [currentHash, setCurrentHash] = useState(window.location.hash);
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(localStorage.getItem('isAdminLoggedIn') === 'true');
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -20,6 +21,18 @@ function App() {
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  useEffect(() => {
+    const handleAuthChange = () => {
+      setIsAdminLoggedIn(localStorage.getItem('isAdminLoggedIn') === 'true');
+    };
+    window.addEventListener('authChange', handleAuthChange);
+    window.addEventListener('storage', handleAuthChange);
+    return () => {
+      window.removeEventListener('authChange', handleAuthChange);
+      window.removeEventListener('storage', handleAuthChange);
+    };
   }, []);
 
   const renderContent = () => {
@@ -36,8 +49,7 @@ function App() {
         return <HomePage />;
     }
   };
-  const isAdminPath = window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/');
-  const isAdminRoute = currentHash === '#admin' || currentHash.startsWith('#admin/') || isAdminPath;
+  const isAdminRoute = isAdminLoggedIn;
   const isStudentPath = window.location.pathname === '/student' || window.location.pathname.startsWith('/student/');
   const isStudentRoute = currentHash === '#student' || currentHash.startsWith('#student/') || isStudentPath;
 

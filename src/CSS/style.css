@@ -152,19 +152,43 @@
   
   /* RESPONSIVE */
   @media (max-width: 768px) {
-    .nav-links {
-      display: none;
+    .nav-links, .nav-actions {
+      display: none !important;
+    }
+  
+    .navbar {
+      padding: 12px 0;
+    }
+  
+    .hero {
+      height: auto;
+      min-height: 90vh;
+      padding: 80px 0;
+      display: flex;
+      align-items: center;
     }
   
     .hero h1 {
       font-size: 32px;
+      line-height: 1.2;
+    }
+  
+    .hero-description {
+      font-size: 15px;
+      margin-bottom: 24px;
+      padding: 0 10px;
     }
   
     .footer-container {
       grid-template-columns: 1fr;
+      gap: 30px;
     }
   
     .hero-buttons {
       flex-direction: column;
+      gap: 12px;
+      width: 100%;
+      max-width: 280px;
+      margin: 0 auto;
     }
   }

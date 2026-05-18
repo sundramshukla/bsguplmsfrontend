@@ -171,10 +171,10 @@ const AdminCourses = () => {
   };
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="p-4 md:p-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h2 className="text-3xl font-bold text-slate-800">Manage Courses</h2>
-        <button onClick={() => handleOpenForm()} className="bg-[#7c3aed] text-white px-5 py-2.5 rounded-lg shadow-md hover:bg-[#6d28d9] font-medium transition-colors">
+        <button onClick={() => handleOpenForm()} className="w-full sm:w-auto bg-[#7c3aed] text-white px-5 py-2.5 rounded-lg shadow-md hover:bg-[#6d28d9] font-medium transition-colors text-center">
           + Add New Course
         </button>
       </div>
