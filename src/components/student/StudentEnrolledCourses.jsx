@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BASE_URL } from '../../config';
 
-const YouTubePlayer = ({ url, title, courseId, partNum }) => {
+const YouTubePlayer = ({ url, title, courseId, partNum, onVideoEnd }) => {
   const playerRef = React.useRef(null);
   const [playerReady, setPlayerReady] = React.useState(false);
   const userId = localStorage.getItem('userId') || 'guest';
@@ -54,18 +54,28 @@ const YouTubePlayer = ({ url, title, courseId, partNum }) => {
                 let maxTimeWatched = savedTime;
                 
                 timer = setInterval(() => {
-                  if (event.target && typeof event.target.getCurrentTime === 'function') {
-                    const currentTime = event.target.getCurrentTime();
-                    if (currentTime > maxTimeWatched + 2.5) {
-                      event.target.seekTo(maxTimeWatched, true);
-                    } else {
-                      if (currentTime > maxTimeWatched) {
-                        maxTimeWatched = currentTime;
-                        localStorage.setItem(progressKey, currentTime.toString());
+                  if (event.target && typeof event.target.getCurrentTime === 'function' && typeof event.target.getPlayerState === 'function') {
+                    const state = event.target.getPlayerState();
+                    if (state === 1) { // PLAYING state
+                      const currentTime = event.target.getCurrentTime();
+                      if (currentTime > maxTimeWatched + 2.5) {
+                        event.target.seekTo(maxTimeWatched, true);
+                      } else {
+                        if (currentTime > maxTimeWatched) {
+                          maxTimeWatched = currentTime;
+                          localStorage.setItem(progressKey, currentTime.toString());
+                        }
                       }
                     }
                   }
                 }, 400);
+              },
+              'onStateChange': (event) => {
+                if (event.data === 0) { // 0 represents ENDED
+                  if (typeof onVideoEnd === 'function') {
+                    onVideoEnd();
+                  }
+                }
               }
             }
           });
@@ -182,12 +192,7 @@ const StudentEnrolledCourses = () => {
           const res = await fetch(`${BASE_URL}/bsgupadmin/create-lesson/?course_id=${activeCourse.id}`);
           const data = await res.json();
           if (data.success && data.data && data.data.length > 0) {
-            const firstLesson = data.data[0];
-            if (firstLesson.sub_lessons && firstLesson.sub_lessons.length > 0) {
-              setLessons(firstLesson.sub_lessons);
-            } else {
-              setLessons(data.data);
-            }
+            setLessons(data.data);
           } else {
             setLessons([]);
           }
@@ -242,26 +247,36 @@ const StudentEnrolledCourses = () => {
     try {
       // Start the quiz on backend
       const userId = localStorage.getItem('userId') || 3;
+      const cachedQuizId = localStorage.getItem(`quiz_id_course_${activeCourse.id}`) || activeCourse.id;
+      
       try {
         await fetch(`${BASE_URL}/bsgupadmin/start-quiz/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             user_id: parseInt(userId, 10),
-            quiz_id: 1
+            quiz_id: parseInt(cachedQuizId, 10)
           })
         });
       } catch (startErr) {
         console.error("Start quiz API failed, proceeding anyway", startErr);
       }
 
-      // Trying to fetch quiz with ID 1
-      const res = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?quiz_id=1`);
+      // Trying to fetch quiz with dynamic ID
+      const res = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?quiz_id=${cachedQuizId}`);
       if (res.ok) {
         const data = await res.json();
-        setQuizData(data);
+        const quizObj = data.title ? data : (data.data || {});
+        setQuizData(quizObj);
       } else {
-        setQuizData(fallbackQuiz);
+        const fallbackRes = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?quiz_id=${activeCourse.id}`);
+        if (fallbackRes.ok) {
+          const data = await fallbackRes.json();
+          const quizObj = data.title ? data : (data.data || {});
+          setQuizData(quizObj);
+        } else {
+          setQuizData(fallbackQuiz);
+        }
       }
     } catch (err) {
       console.error("Quiz fetch failed, using highly optimized local fallback quiz.");
@@ -290,10 +305,15 @@ const StudentEnrolledCourses = () => {
     setQuizLoading(true);
     try {
       const userId = localStorage.getItem('userId') || 3;
-      const formattedAnswers = Object.keys(selectedAnswers).map(qId => ({
-        question_id: parseInt(qId, 10),
-        answer: selectedAnswers[qId]
-      }));
+      const formattedAnswers = Object.keys(selectedAnswers).map(idxKey => {
+        const questionIndex = parseInt(idxKey, 10);
+        const questionObj = questionsList[questionIndex] || {};
+        return {
+          question_id: parseInt(questionObj.id || questionObj.question_id || questionIndex, 10),
+          answer: selectedAnswers[idxKey]
+        };
+      });
+      const cachedQuizId = localStorage.getItem(`quiz_id_course_${activeCourse.id}`) || activeCourse.id;
 
       // 1. Submit to API
       const res = await fetch(`${BASE_URL}/bsgupadmin/submit-quiz/`, {
@@ -301,20 +321,41 @@ const StudentEnrolledCourses = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_id: parseInt(userId, 10),
-          quiz_id: 1,
+          quiz_id: parseInt(cachedQuizId, 10),
           answers: formattedAnswers
         })
       });
 
-      // 2. Perform score calculation
-      let score = 0;
-      questionsList.forEach(q => {
-        if (selectedAnswers[q.id] === q.correct_answer) {
-          score += 1;
+      let finalScorePercentage = 0;
+      let passed = false;
+
+      if (res.ok) {
+        const resultData = await res.json();
+        if (resultData && resultData.success && resultData.data) {
+          finalScorePercentage = Math.round(resultData.data.percentage);
+          passed = resultData.data.passed === true || resultData.data.passed === "true";
+        } else {
+          // Local fallback in case API succeeded but data was malformed
+          let score = 0;
+          questionsList.forEach((q, idx) => {
+            if (selectedAnswers[idx] === q.correct_answer) {
+              score += 1;
+            }
+          });
+          finalScorePercentage = Math.round((score / questionsList.length) * 100);
+          passed = finalScorePercentage >= (quizData.passing_marks || 60);
         }
-      });
-      const finalScorePercentage = Math.round((score / questionsList.length) * 100);
-      const passed = finalScorePercentage >= (quizData.passing_marks || 60);
+      } else {
+        // Local fallback in case submission failed
+        let score = 0;
+        questionsList.forEach((q, idx) => {
+          if (selectedAnswers[idx] === q.correct_answer) {
+            score += 1;
+          }
+        });
+        finalScorePercentage = Math.round((score / questionsList.length) * 100);
+        passed = finalScorePercentage >= (quizData.passing_marks || 60);
+      }
 
       setQuizResult({
         score: finalScorePercentage,
@@ -371,17 +412,17 @@ const StudentEnrolledCourses = () => {
   if (activeCourse) {
     const fallbackParts = [
       {
-        title: "Part 1: Scout Oath and Scout Law",
+        title: "Scout Oath and Scout Law",
         description: "In this introductory lesson, you will learn the core foundations of the Scout & Guide movement. Master the Scout Sign, Scout Salute, and study the 9 essential clauses of the Scout Law that instill honesty, discipline, and loyalty.",
         youtube_url: "https://www.youtube.com/watch?v=g_TfFfD4WvA" // BSG introductory video placeholder
       },
       {
-        title: "Part 2: Essential Knots & Pioneering",
+        title: "Essential Knots & Pioneering",
         description: "Pioneering is the art of building structures using timber spars and ropes. In this second phase, practice the primary knots crucial for survival and encampment, including the Reef Knot, Clove Hitch, and Bowline.",
         youtube_url: "https://www.youtube.com/watch?v=zFp-61d0y60"
       },
       {
-        title: "Part 3: First Aid & Survival Skills",
+        title: "First Aid & Survival Skills",
         description: "In the final lesson of this course, you will learn life-saving emergency medical techniques. Gain practical knowledge in dressing wounds, treating burns, making improvised stretchers, and managing fractured limbs.",
         youtube_url: "https://www.youtube.com/watch?v=G6jWcZlye-0"
       }
@@ -420,7 +461,7 @@ const StudentEnrolledCourses = () => {
                         : 'text-slate-300 cursor-not-allowed bg-slate-50/50'
                   }`}
                 >
-                  <span>Part {num}</span>
+                  <span className="truncate max-w-[85%]">{part.title}</span>
                   <span>{currentPart > num ? '✅' : '🔒'}</span>
                 </button>
               );
@@ -454,17 +495,17 @@ const StudentEnrolledCourses = () => {
                   title={activeParts[currentPart - 1].title}
                   courseId={activeCourse.id}
                   partNum={currentPart}
+                  onVideoEnd={handleNextPart}
                 />
 
                 <p className="text-slate-600 leading-relaxed">{activeParts[currentPart - 1].description}</p>
 
-                <div className="flex justify-end pt-4 border-t border-slate-100">
-                  <button 
-                    onClick={handleNextPart}
-                    className="bg-emerald-500 text-white font-bold px-8 py-3 rounded-xl hover:bg-emerald-600 transition-all flex items-center gap-2"
-                  >
-                    Mark as Completed & Next ➡️
-                  </button>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-between mt-4">
+                  <div className="flex items-center gap-2 text-slate-600 font-semibold text-sm">
+                    <span>📺</span>
+                    <span>Watch the entire video to complete this lesson and unlock the next module automatically.</span>
+                  </div>
+                  <span className="text-emerald-500 font-bold text-sm bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">Auto-advancing Enabled</span>
                 </div>
               </div>
             ) : (
@@ -527,16 +568,16 @@ const StudentEnrolledCourses = () => {
                   // Active Questions List
                   <div className="space-y-8 pt-4">
                     {(quizData.questions || []).map((q, idx) => (
-                      <div key={q.id} className="border border-slate-200 rounded-xl p-5 bg-slate-50/50">
+                      <div key={q.id || idx} className="border border-slate-200 rounded-xl p-5 bg-slate-50/50">
                         <h4 className="font-bold text-slate-800 mb-4 text-lg">Question {idx + 1}: {q.question}</h4>
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           {[q.option1, q.option2, q.option3, q.option4].map((opt, oIdx) => (
                             <button
                               key={oIdx}
-                              onClick={() => handleOptionSelect(q.id, opt)}
+                              onClick={() => handleOptionSelect(idx, opt)}
                               className={`w-full text-left p-3 rounded-xl border font-semibold transition-all ${
-                                selectedAnswers[q.id] === opt 
+                                selectedAnswers[idx] === opt 
                                   ? 'bg-emerald-50 border-emerald-500 text-emerald-700 ring-2 ring-emerald-500/20' 
                                   : 'bg-white border-slate-200 hover:border-slate-300 text-slate-600'
                               }`}

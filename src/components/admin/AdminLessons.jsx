@@ -188,37 +188,7 @@ const AdminLessons = () => {
               <label className="block text-sm font-semibold text-slate-700 mb-1">Description</label>
               <textarea name="description" value={formData.description} onChange={handleChange} className="w-full border border-slate-300 p-2.5 rounded h-24 focus:ring-2 focus:ring-[#7c3aed] focus:outline-none"></textarea>
             </div>
-            
-            <div className="md:col-span-2 mt-4 pt-4 border-t border-slate-200">
-              <div className="flex justify-between items-center mb-4">
-                <h4 className="text-lg font-bold text-slate-700">Sub Lessons</h4>
-                <button type="button" onClick={addSubLesson} className="bg-slate-100 text-[#7c3aed] px-4 py-2 rounded-lg font-medium hover:bg-slate-200 transition-colors border border-slate-200">
-                  + Add Sub Lesson
-                </button>
-              </div>
-              {formData.sub_lessons.map((sl, idx) => (
-                <div key={idx} className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-4 relative">
-                  <button type="button" onClick={() => removeSubLesson(idx)} className="absolute top-2 right-2 text-rose-500 hover:text-rose-700 font-bold bg-rose-100 w-8 h-8 rounded-full flex items-center justify-center">×</button>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Sub Lesson Title</label>
-                      <input type="text" value={sl.title} onChange={(e) => handleSubLessonChange(idx, 'title', e.target.value)} required className="w-full border border-slate-300 p-2 rounded focus:ring-2 focus:ring-[#7c3aed] focus:outline-none text-sm" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">YouTube URL</label>
-                      <input type="url" value={sl.youtube_url} onChange={(e) => handleSubLessonChange(idx, 'youtube_url', e.target.value)} required className="w-full border border-slate-300 p-2 rounded focus:ring-2 focus:ring-[#7c3aed] focus:outline-none text-sm" />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Description</label>
-                      <textarea value={sl.description} onChange={(e) => handleSubLessonChange(idx, 'description', e.target.value)} className="w-full border border-slate-300 p-2 rounded h-16 focus:ring-2 focus:ring-[#7c3aed] focus:outline-none text-sm"></textarea>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {formData.sub_lessons.length === 0 && (
-                <p className="text-sm text-slate-500 italic">No sub lessons added yet.</p>
-              )}
-            </div>
+
             <div className="md:col-span-2 flex justify-end gap-3 mt-4">
               <button type="button" onClick={() => setShowForm(false)} className="bg-slate-200 text-slate-800 px-6 py-2.5 rounded font-medium hover:bg-slate-300 transition-colors">Cancel</button>
               <button type="submit" className="bg-[#7c3aed] text-white px-8 py-2.5 rounded font-medium shadow hover:bg-[#6d28d9] transition-colors">{editingLesson ? 'Update Lesson' : 'Save Lesson'}</button>

@@ -31,11 +31,7 @@ const AdminAnalytics = () => {
             try {
               const lRes = await fetch(`${BASE_URL}/bsgupadmin/create-lesson/?course_id=${course.id}`);
               const lData = await lRes.json();
-              if (lData.success && lData.data) {
-                const firstLesson = lData.data[0];
-                if (firstLesson && firstLesson.sub_lessons && firstLesson.sub_lessons.length > 0) {
-                  return firstLesson.sub_lessons.length;
-                }
+              if (lData && lData.success && Array.isArray(lData.data)) {
                 return lData.data.length;
               }
             } catch (err) {

@@ -5,6 +5,8 @@ const AdminQuizzes = () => {
   const [courses, setCourses] = useState([]);
   const [selectedCourseId, setSelectedCourseId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [existingQuiz, setExistingQuiz] = useState(null);
+  const [checkingQuiz, setCheckingQuiz] = useState(false);
 
   // Quiz Form states
   const [quizForm, setQuizForm] = useState({
@@ -25,6 +27,48 @@ const AdminQuizzes = () => {
     correct_answer: 'Django'
   });
 
+  const [allQuizzes, setAllQuizzes] = useState([]);
+  const [quizzesLoading, setQuizzesLoading] = useState(false);
+
+  const fetchAllExistingQuizzes = async (coursesList) => {
+    setQuizzesLoading(true);
+    const quizzesFound = [];
+    try {
+      // Query Quiz IDs 1 to 50 in parallel
+      const idList = Array.from({ length: 50 }, (_, i) => i + 1);
+      const promises = idList.map(async (qId) => {
+        try {
+          const res = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?quiz_id=${qId}`);
+          if (res.ok) {
+            const data = await res.json();
+            const quizObj = data.title ? data : (data.data || {});
+            if (quizObj && quizObj.title) {
+              const courseId = quizObj.course_id || data.course_id || qId;
+              const courseTitle = coursesList.find(c => c.id.toString() === courseId.toString())?.title || `Course #${courseId}`;
+              return {
+                id: qId.toString(),
+                title: quizObj.title || `Quiz #${qId}`,
+                courseTitle: courseTitle
+              };
+            }
+          }
+        } catch (e) {
+          // Ignore
+        }
+        return null;
+      });
+
+      const results = await Promise.all(promises);
+      results.forEach(q => {
+        if (q) quizzesFound.push(q);
+      });
+    } catch (err) {
+      console.error("Error fetching all quizzes:", err);
+    }
+    setAllQuizzes(quizzesFound);
+    setQuizzesLoading(false);
+  };
+
   useEffect(() => {
     const fetchCourses = async () => {
       try {
@@ -35,6 +79,7 @@ const AdminQuizzes = () => {
           if (data.data.length > 0) {
             setSelectedCourseId(data.data[0].id.toString());
           }
+          fetchAllExistingQuizzes(data.data);
         }
       } catch (err) {
         console.error('Failed to fetch courses:', err);
@@ -42,6 +87,77 @@ const AdminQuizzes = () => {
     };
     fetchCourses();
   }, []);
+
+  const checkQuizForCourse = async (courseId) => {
+    setCheckingQuiz(true);
+    setExistingQuiz(null);
+    try {
+      const cachedQuizId = localStorage.getItem(`quiz_id_course_${courseId}`);
+      const targetQuizId = cachedQuizId || courseId;
+
+      const res = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?quiz_id=${targetQuizId}`);
+      if (res.ok) {
+        const data = await res.json();
+        const quizObj = data.title ? data : (data.data || {});
+        if (quizObj && quizObj.title) {
+          setExistingQuiz({
+            id: targetQuizId,
+            title: quizObj.title || "Course Final Quiz",
+            total_marks: quizObj.total_marks || 100,
+            passing_marks: quizObj.passing_marks || 60,
+            duration: quizObj.duration || 30
+          });
+          setQuizIdForQuestion(targetQuizId.toString());
+          setCheckingQuiz(false);
+          return;
+        }
+      }
+
+      // Try fallback course_id query
+      const resCourse = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?course_id=${courseId}`);
+      if (resCourse.ok) {
+        const data = await resCourse.json();
+        const quizObj = data.title ? data : (data.data || {});
+        if (quizObj && quizObj.title) {
+          const qId = quizObj.id || quizObj.quiz_id || courseId;
+          setExistingQuiz({
+            id: qId,
+            title: quizObj.title || "Course Final Quiz",
+            total_marks: quizObj.total_marks || 100,
+            passing_marks: quizObj.passing_marks || 60,
+            duration: quizObj.duration || 30
+          });
+          setQuizIdForQuestion(qId.toString());
+          localStorage.setItem(`quiz_id_course_${courseId}`, qId.toString());
+          setCheckingQuiz(false);
+          return;
+        }
+      }
+    } catch (err) {
+      console.error("Failed to check existing quiz:", err);
+    }
+
+    const cachedQuizId = localStorage.getItem(`quiz_id_course_${courseId}`);
+    if (cachedQuizId) {
+      setExistingQuiz({
+        id: cachedQuizId,
+        title: `Quiz #${cachedQuizId}`,
+        total_marks: 100,
+        passing_marks: 60,
+        duration: 30
+      });
+      setQuizIdForQuestion(cachedQuizId.toString());
+    } else {
+      setQuizIdForQuestion('');
+    }
+    setCheckingQuiz(false);
+  };
+
+  useEffect(() => {
+    if (selectedCourseId) {
+      checkQuizForCourse(selectedCourseId);
+    }
+  }, [selectedCourseId]);
 
   const handleQuizChange = (e) => {
     setQuizForm({ ...quizForm, [e.target.name]: e.target.value });
@@ -74,9 +190,27 @@ const AdminQuizzes = () => {
       
       if (res.ok || data.success) {
         alert(data.message || data.success || "Quiz Created Successfully!");
-        if (data.quiz_id) {
-          setQuizIdForQuestion(data.quiz_id.toString());
-        }
+        const newQuizId = (data.data?.quiz_id || data.quiz_id || data.id || "1").toString();
+        localStorage.setItem(`quiz_id_course_${selectedCourseId}`, newQuizId);
+        setQuizIdForQuestion(newQuizId);
+        setExistingQuiz({
+          id: newQuizId,
+          title: quizForm.title,
+          total_marks: quizForm.total_marks,
+          passing_marks: quizForm.passing_marks,
+          duration: quizForm.duration
+        });
+
+        // Add to dropdown list immediately
+        const newQuizObj = {
+          id: newQuizId,
+          title: quizForm.title,
+          courseTitle: courses.find(c => c.id.toString() === selectedCourseId.toString())?.title || `Course #${selectedCourseId}`
+        };
+        setAllQuizzes(prev => {
+          if (prev.some(q => q.id === newQuizId)) return prev;
+          return [...prev, newQuizObj];
+        });
       } else {
         alert(data.error || "Failed to create quiz.");
       }
@@ -146,17 +280,53 @@ const AdminQuizzes = () => {
             <p className="text-xs text-slate-500">Configure the duration and parameters for the final exam.</p>
           </div>
 
-          <form onSubmit={handleCreateQuiz} className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Target Course</label>
-              <select 
-                value={selectedCourseId} 
-                onChange={(e) => setSelectedCourseId(e.target.value)}
-                className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-[#7c3aed] focus:outline-none"
-              >
-                {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
-              </select>
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">Target Course</label>
+            <select 
+              value={selectedCourseId} 
+              onChange={(e) => setSelectedCourseId(e.target.value)}
+              className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-[#7c3aed] focus:outline-none"
+            >
+              {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+            </select>
+          </div>
+
+          {/* Quiz Status Card */}
+          {checkingQuiz ? (
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-center">
+              <span className="text-slate-500 font-medium text-sm animate-pulse">Checking for existing quiz...</span>
             </div>
+          ) : existingQuiz ? (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-emerald-800 font-bold text-sm flex items-center gap-1.5">
+                  <span>✨</span> Quiz Already Exists
+                </span>
+                <span className="bg-emerald-100 text-emerald-800 text-xs font-extrabold px-2 py-0.5 rounded-full border border-emerald-200">
+                  Quiz ID: {existingQuiz.id}
+                </span>
+              </div>
+              <div className="text-xs text-slate-600 space-y-1">
+                <p><strong>Title:</strong> {existingQuiz.title}</p>
+                <p><strong>Total Marks:</strong> {existingQuiz.total_marks} | <strong>Passing Marks:</strong> {existingQuiz.passing_marks}</p>
+                <p><strong>Duration:</strong> {existingQuiz.duration} minutes</p>
+              </div>
+              <p className="text-[10px] text-slate-500 italic mt-2">
+                ℹ️ This Quiz ID is now automatically selected in Step 2 below so you can add questions directly!
+              </p>
+            </div>
+          ) : (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+              <span className="text-amber-800 font-bold text-sm flex items-center gap-1.5">
+                <span>📝</span> No Quiz Created Yet
+              </span>
+              <p className="text-xs text-slate-600 mt-1">
+                There is no quiz configured for this course. Fill out the parameters below to create the quiz first.
+              </p>
+            </div>
+          )}
+
+          <form onSubmit={handleCreateQuiz} className="space-y-4">
 
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1">Quiz Title</label>
@@ -226,15 +396,30 @@ const AdminQuizzes = () => {
 
           <form onSubmit={handleCreateQuestion} className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Target Quiz ID</label>
-              <input 
-                type="number" 
-                value={quizIdForQuestion} 
-                onChange={(e) => setQuizIdForQuestion(e.target.value)} 
-                required 
-                placeholder="E.g. 1"
-                className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-[#7c3aed] focus:outline-none" 
-              />
+              <label className="block text-sm font-semibold text-slate-700 mb-1">Target Quiz (ID & Title)</label>
+              {quizzesLoading ? (
+                <div className="w-full border border-slate-300 p-2.5 rounded-lg bg-slate-50 text-slate-500 text-sm animate-pulse">
+                  Loading created quizzes...
+                </div>
+              ) : allQuizzes.length > 0 ? (
+                <select 
+                  value={quizIdForQuestion} 
+                  onChange={(e) => setQuizIdForQuestion(e.target.value)}
+                  required 
+                  className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-[#7c3aed] focus:outline-none"
+                >
+                  <option value="">-- Select a Quiz --</option>
+                  {allQuizzes.map(q => (
+                    <option key={q.id} value={q.id}>
+                      ID: {q.id} | {q.title} ({q.courseTitle})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+                  ⚠️ No quizzes created yet. Please create a quiz in Step 1 first to add questions!
+                </div>
+              )}
             </div>
 
             <div>
