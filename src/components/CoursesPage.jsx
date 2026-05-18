@@ -3,6 +3,7 @@ import Navbar from './Navbar';
 import Footer from './Footer';
 import { BASE_URL } from '../config';
 import EnrollWithoutLoginModal from './EnrollWithoutLoginModal';
+import Loader from './Loader';
 
 const DEPARTMENTS_MAP = {
   organisation: 'Organization',
@@ -157,9 +158,7 @@ const CoursesPage = () => {
 
         {/* Courses Grid */}
         {loading ? (
-          <div className="flex justify-center p-12">
-            <p className="text-xl text-slate-500 font-medium">Loading courses...</p>
-          </div>
+          <Loader message="Loading courses..." />
         ) : filteredCourses.length === 0 ? (
           <div className="flex justify-center p-12">
             <p className="text-xl text-slate-500 font-medium">No courses available for this department.</p>

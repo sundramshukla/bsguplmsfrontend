@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BASE_URL } from '../../config';
+import Loader from '../Loader';
 
 const StudentDepartmentCourses = ({ department, title }) => {
   const [courses, setCourses] = useState([]);
@@ -73,7 +74,7 @@ const StudentDepartmentCourses = ({ department, title }) => {
       </div>
 
       {loading ? (
-        <div className="flex justify-center p-10"><p className="text-xl text-slate-500 font-medium">Loading courses...</p></div>
+        <Loader message="Loading courses..." />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {courses.map(course => {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BASE_URL } from '../../config';
+import Loader from '../Loader';
 
 const YouTubePlayer = ({ url, title, courseId, partNum, onVideoEnd }) => {
   const playerRef = React.useRef(null);
@@ -174,6 +175,156 @@ const StudentEnrolledCourses = () => {
   // Student Profile for Certificate
   const [studentName, setStudentName] = useState('Sundram Shukla');
   const [showCertificate, setShowCertificate] = useState(false);
+
+  const handlePrintCertificate = () => {
+    const newWindow = window.open("", "_blank");
+    newWindow.document.write(`
+      <html>
+        <head>
+          <title>BSGUP Course Certificate - ${studentName}</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Inter:wght@400;600;800&family=Pinyon+Script&display=swap');
+            body {
+              margin: 0;
+              padding: 20px;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              min-height: 90vh;
+              background-color: #fff;
+              font-family: 'Inter', sans-serif;
+            }
+            .certificate-container {
+              border: 8px solid #fbbf24;
+              padding: 10px;
+              width: 100%;
+              max-width: 700px;
+              box-sizing: border-box;
+            }
+            .certificate-content {
+              border: 4px dashed #0f172a;
+              border-radius: 8px;
+              padding: 40px 30px;
+              text-align: center;
+              box-sizing: border-box;
+            }
+            .gold-star {
+              font-size: 48px;
+              margin-bottom: 10px;
+            }
+            .title {
+              font-family: 'Cinzel', serif;
+              font-size: 26px;
+              font-weight: 900;
+              color: #0f172a;
+              letter-spacing: 2px;
+              margin: 0 0 5px 0;
+            }
+            .subtitle {
+              font-size: 12px;
+              font-weight: 800;
+              color: #d97706;
+              letter-spacing: 3px;
+              text-transform: uppercase;
+              margin-bottom: 25px;
+            }
+            .italic-text {
+              font-size: 12px;
+              font-style: italic;
+              font-weight: 600;
+              color: #64748b;
+            }
+            .student-name {
+              font-family: 'Pinyon Script', cursive;
+              font-size: 48px;
+              font-weight: bold;
+              color: #1e293b;
+              margin: 20px 0;
+              text-decoration: underline;
+              text-decoration-style: double;
+              text-decoration-color: #fbbf24;
+            }
+            .desc {
+              font-size: 13px;
+              color: #475569;
+              max-width: 480px;
+              margin: 0 auto 25px auto;
+              line-height: 1.6;
+            }
+            .course-title {
+              font-size: 18px;
+              font-weight: 800;
+              color: #047857;
+              background-color: #ecfdf5;
+              padding: 10px 28px;
+              border-radius: 9999px;
+              display: inline-block;
+              margin-bottom: 35px;
+            }
+            .signatures {
+              display: grid;
+              grid-template-cols: 1fr 1fr;
+              gap: 40px;
+              max-width: 450px;
+              margin: 0 auto;
+              border-top: 1px solid #e2e8f0;
+              padding-top: 20px;
+            }
+            .signature-title {
+              font-size: 13px;
+              font-style: italic;
+              font-weight: 600;
+              color: #1e293b;
+              margin-bottom: 5px;
+            }
+            .signature-line {
+              width: 120px;
+              border-bottom: 1px solid #94a3b8;
+              margin: 0 auto;
+            }
+            .signature-subtitle {
+              font-size: 10px;
+              color: #94a3b8;
+              margin-top: 5px;
+              font-weight: 800;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="certificate-container">
+            <div class="certificate-content">
+              <div class="gold-star">⚜️</div>
+              <div class="title">THE BHARAT SCOUTS & GUIDES</div>
+              <div class="subtitle">Uttar Pradesh State Headquarters</div>
+              <div class="italic-text">This is to certify that</div>
+              <div class="student-name">${studentName}</div>
+              <div class="desc">has successfully completed the online training syllabus and passed the qualified examinations of the</div>
+              <div class="course-title">${activeCourse.title}</div>
+              <div class="signatures">
+                <div>
+                  <div class="signature-title">State Commissioner</div>
+                  <div class="signature-line"></div>
+                  <div class="signature-subtitle">BSGUP Head Office</div>
+                </div>
+                <div>
+                  <div class="signature-title">State Secretary</div>
+                  <div class="signature-line"></div>
+                  <div class="signature-subtitle">BSGUP Lucknow</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    newWindow.document.close();
+  };
 
   useEffect(() => {
     // Fetch profile to get true student name for certificate
@@ -488,7 +639,6 @@ const StudentEnrolledCourses = () => {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Sidebar */}
           <div className="lg:col-span-1 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm h-fit space-y-2">
-            <h4 className="font-bold text-slate-800 px-2 mb-3">Course Modules</h4>
             
             {activeParts.map((part, index) => {
               const num = index + 1;
@@ -528,7 +678,7 @@ const StudentEnrolledCourses = () => {
           {/* Main Video & Content */}
           <div className="lg:col-span-3 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
             {lessonsLoading ? (
-              <div className="flex justify-center p-10"><p className="text-xl text-slate-500 font-medium">Loading Course Modules...</p></div>
+              <Loader message="Loading Course Modules..." />
             ) : currentPart <= activeParts.length ? (
               <div className="space-y-6">
                 <h3 className="text-2xl font-bold text-slate-800">{activeParts[currentPart - 1].title}</h3>
@@ -652,49 +802,60 @@ const StudentEnrolledCourses = () => {
         {/* Certificate Modal */}
         {showCertificate && (
           <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4 overflow-y-auto">
-            <div className="bg-white p-8 rounded-2xl max-w-2xl w-full shadow-2xl relative border-8 border-amber-400">
+            <div className="bg-white p-4 md:p-8 rounded-2xl max-w-2xl w-full shadow-2xl relative border-4 md:border-8 border-amber-400 my-auto">
               <button 
                 onClick={() => setShowCertificate(false)}
-                className="absolute top-4 right-4 text-slate-400 hover:text-slate-800 text-2xl font-bold"
+                className="absolute top-3 right-3 text-slate-400 hover:text-slate-800 text-xl font-bold bg-slate-100 hover:bg-slate-200 rounded-full w-8 h-8 flex items-center justify-center transition-colors"
               >
                 ✕
               </button>
               
               {/* Golden Certificate Layout */}
-              <div className="text-center py-6 border-4 border-slate-900 border-dashed rounded-lg p-6">
-                <div className="text-5xl mb-2">⚜️</div>
-                <h2 className="text-2xl font-black text-slate-900 tracking-wider">THE BHARAT SCOUTS & GUIDES</h2>
-                <h4 className="text-xs font-bold text-amber-600 tracking-widest uppercase mb-6">Uttar Pradesh State Headquarters</h4>
+              <div className="text-center py-4 md:py-6 border-2 md:border-4 border-slate-900 border-dashed rounded-lg p-3 md:p-6">
+                <div className="text-3xl md:text-5xl mb-2">⚜️</div>
+                <h2 className="text-base md:text-2xl font-black text-slate-900 tracking-wider">THE BHARAT SCOUTS & GUIDES</h2>
+                <h4 className="text-[10px] md:text-xs font-bold text-amber-600 tracking-widest uppercase mb-4 md:mb-6">Uttar Pradesh State Headquarters</h4>
                 
-                <p className="text-xs italic font-semibold text-slate-500">This is to certify that</p>
-                <h1 className="text-4xl font-serif font-black text-slate-800 my-4 underline decoration-double decoration-amber-400">{studentName}</h1>
+                <p className="text-[10px] md:text-xs italic font-semibold text-slate-500">This is to certify that</p>
+                <h1 className="text-xl md:text-4xl font-serif font-black text-slate-800 my-2 md:my-4 underline decoration-double decoration-amber-400 truncate px-2" title={studentName}>
+                  {studentName}
+                </h1>
                 
-                <p className="text-sm text-slate-600 max-w-md mx-auto leading-relaxed mb-6">
+                <p className="text-[10px] md:text-sm text-slate-600 max-w-md mx-auto leading-relaxed mb-4 md:mb-6">
                   has successfully completed the online training syllabus and passed the qualified examinations of the
                 </p>
                 
-                <h3 className="text-xl font-bold text-emerald-700 bg-emerald-50 py-2 px-6 rounded-full w-fit mx-auto mb-8">
+                <h3 className="text-sm md:text-xl font-bold text-emerald-700 bg-emerald-50 py-1.5 md:py-2 px-4 md:px-6 rounded-full w-fit mx-auto mb-6 md:mb-8">
                   {activeCourse.title}
                 </h3>
                 
-                <div className="grid grid-cols-2 gap-8 border-t border-slate-200 pt-6 max-w-md mx-auto">
+                <div className="grid grid-cols-2 gap-4 border-t border-slate-200 pt-4 md:pt-6 max-w-md mx-auto">
                   <div className="text-center">
-                    <div className="font-serif italic font-semibold text-slate-800 mb-1">State Commissioner</div>
-                    <div className="w-24 h-1 border-b border-slate-400 mx-auto"></div>
-                    <div className="text-[10px] text-slate-400 mt-1 font-bold">BSGUP Head Office</div>
+                    <div className="font-serif italic font-semibold text-slate-800 text-[10px] md:text-xs mb-1">State Commissioner</div>
+                    <div className="w-16 md:w-24 h-0.5 bg-slate-300 mx-auto"></div>
+                    <div className="text-[8px] md:text-[10px] text-slate-400 mt-1 font-bold">BSGUP Head Office</div>
                   </div>
                   <div className="text-center">
-                    <div className="font-serif italic font-semibold text-slate-800 mb-1">State Secretary</div>
-                    <div className="w-24 h-1 border-b border-slate-400 mx-auto"></div>
-                    <div className="text-[10px] text-slate-400 mt-1 font-bold">BSGUP Lucknow</div>
+                    <div className="font-serif italic font-semibold text-slate-800 text-[10px] md:text-xs mb-1">State Secretary</div>
+                    <div className="w-16 md:w-24 h-0.5 bg-slate-300 mx-auto"></div>
+                    <div className="text-[8px] md:text-[10px] text-slate-400 mt-1 font-bold">BSGUP Lucknow</div>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-6 text-center">
-                <div className="bg-emerald-50 text-emerald-800 p-3 rounded-lg border border-emerald-200 inline-flex items-center gap-2 text-xs font-bold">
-                  <span>📱</span> A secure download link has been dispatched to your WhatsApp number!
-                </div>
+              <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center items-center">
+                <button 
+                  onClick={handlePrintCertificate}
+                  className="w-full sm:w-auto bg-[#10b981] hover:bg-[#059669] text-white font-extrabold px-6 py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 text-sm"
+                >
+                  <span>⬇️</span> Download PDF Certificate
+                </button>
+                <button 
+                  onClick={() => setShowCertificate(false)}
+                  className="w-full sm:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-6 py-2.5 rounded-xl transition-all text-sm"
+                >
+                  Close Preview
+                </button>
               </div>
             </div>
           </div>
@@ -711,7 +872,7 @@ const StudentEnrolledCourses = () => {
       </div>
 
       {loading ? (
-        <div className="flex justify-center p-10"><p className="text-xl text-slate-500 font-medium">Loading your courses...</p></div>
+        <Loader message="Loading your courses..." />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {courses.map(course => (

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BASE_URL } from '../../config';
+import Loader from '../Loader';
 
 const StudentProfile = () => {
   const [profile, setProfile] = useState(null);
@@ -101,7 +102,7 @@ const StudentProfile = () => {
   };
 
   if (loading) {
-    return <div className="flex justify-center p-10"><p className="text-xl text-slate-500 font-medium">Loading Profile...</p></div>;
+    return <Loader message="Loading Profile..." fullPage={true} />;
   }
 
   return (
