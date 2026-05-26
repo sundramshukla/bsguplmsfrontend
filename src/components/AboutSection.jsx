@@ -6,10 +6,11 @@ function AboutSection() {
         <div className="w-full lg:w-1/2">
           <div className="relative">
             <iframe
-              src="https://www.youtube.com/embed/tXdovpsdkYA?si=dgIQy7NzT8CsCAkp"
+              src="https://www.youtube.com/embed/tXdovpsdkYA?si=dgIQy7NzT8CsCAkp&enablejsapi=1&controls=1&rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&showinfo=0&fs=1"
               title="YouTube video player"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               allowFullScreen
+              sandbox="allow-scripts allow-same-origin allow-presentation"
               className="h-[360px] w-full rounded-2xl object-cover shadow-xl md:h-[420px]"
             ></iframe>
             <div className="absolute -bottom-6 right-6 hidden rounded-2xl bg-[#7c3aed] px-7 py-6 text-white shadow-xl sm:block">

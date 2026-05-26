@@ -12,7 +12,7 @@ const YouTubePlayer = ({ url, title, courseId, partNum, onVideoEnd }) => {
     if (!url) return '';
     if (url.includes('/embed/')) {
       const base = url.split('?')[0];
-      return `${base}?enablejsapi=1&controls=1&rel=0`;
+      return `${base}?enablejsapi=1&controls=1&rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&showinfo=0&fs=1`;
     }
     let videoId = '';
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
@@ -24,7 +24,7 @@ const YouTubePlayer = ({ url, title, courseId, partNum, onVideoEnd }) => {
       else if (url.includes('youtu.be/')) videoId = url.split('youtu.be/')[1]?.split('?')[0];
     }
     if (videoId) {
-      return `https://www.youtube.com/embed/${videoId}?enablejsapi=1&controls=1&rel=0`;
+      return `https://www.youtube.com/embed/${videoId}?enablejsapi=1&controls=1&rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&showinfo=0&fs=1`;
     }
     return url;
   }, [url]);
@@ -64,7 +64,7 @@ const YouTubePlayer = ({ url, title, courseId, partNum, onVideoEnd }) => {
                       } else {
                         if (currentTime > maxTimeWatched) {
                           maxTimeWatched = currentTime;
-                          localStorage.setItem(progressKey, currentTime.toString());
+                           localStorage.setItem(progressKey, currentTime.toString());
                         }
                       }
                     }
@@ -109,8 +109,9 @@ const YouTubePlayer = ({ url, title, courseId, partNum, onVideoEnd }) => {
           src={embedUrl} 
           title={title}
           className="w-full h-full"
-          allow="autoplay; encrypted-media"
+          allow="autoplay; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
+          sandbox="allow-scripts allow-same-origin allow-presentation"
         ></iframe>
       ) : (
         <div className="w-full h-full flex items-center justify-center text-slate-400 font-semibold">No Video Configured</div>
