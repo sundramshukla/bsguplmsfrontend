@@ -123,7 +123,7 @@ const AdminCourses = () => {
     fd.append('duration', finalDuration);
     
     fd.append('department', formData.department);
-    const userId = localStorage.getItem('adminUserId') || formData.user || '1';
+    const userId = localStorage.getItem('adminUserId') || localStorage.getItem('userId') || formData.user || '1';
     fd.append('user', userId);
     
     if (isEditing) {

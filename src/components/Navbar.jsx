@@ -249,20 +249,6 @@ const Navbar = () => {
            }
         }
 
-        if (isAdmin) {
-           localStorage.setItem('isAdminLoggedIn', 'true');
-           localStorage.setItem('adminToken', token || '');
-           localStorage.setItem('isLoggedIn', 'true');
-           setIsLoggedIn(true);
-           window.dispatchEvent(new Event('authChange'));
-           setIsRegisterOpen(false);
-           setIsLoginOpen(false);
-           setOtpMode(false);
-           setProfileMode(false);
-           alert("Welcome, Administrator!");
-           return;
-        }
-
         if (!returnedUserId) {
           if (data) {
             returnedUserId = data.user_id || data.id || data.user || data.userId;
@@ -274,9 +260,27 @@ const Navbar = () => {
             }
           }
         }
+
+        if (isAdmin) {
+           localStorage.setItem('isAdminLoggedIn', 'true');
+           localStorage.setItem('adminToken', token || '');
+           localStorage.setItem('isLoggedIn', 'true');
+           if (returnedUserId) {
+              localStorage.setItem('adminUserId', returnedUserId.toString());
+              localStorage.setItem('userId', returnedUserId.toString());
+           }
+           setIsLoggedIn(true);
+           window.dispatchEvent(new Event('authChange'));
+           setIsRegisterOpen(false);
+           setIsLoginOpen(false);
+           setOtpMode(false);
+           setProfileMode(false);
+           alert("Welcome, Administrator!");
+           return;
+        }
         
         if (returnedUserId) {
-           localStorage.setItem('userId', returnedUserId);
+           localStorage.setItem('userId', returnedUserId.toString());
         } else {
            console.warn("Could not find user ID in response or token:", data);
         }
@@ -404,6 +408,8 @@ const Navbar = () => {
     localStorage.removeItem('isAdminLoggedIn');
     localStorage.removeItem('token');
     localStorage.removeItem('adminToken');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('adminUserId');
     window.dispatchEvent(new Event('authChange'));
     setFormData({ name: '', email: '', mobile_number: '' });
     setLoginMobile('');

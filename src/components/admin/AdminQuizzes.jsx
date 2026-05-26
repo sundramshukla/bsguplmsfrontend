@@ -171,7 +171,7 @@ const AdminQuizzes = () => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const adminUserId = localStorage.getItem('adminUserId') || 2;
+      const adminUserId = localStorage.getItem('adminUserId') || localStorage.getItem('userId') || 2;
       const payload = {
         user_id: parseInt(adminUserId, 10),
         course_id: parseInt(selectedCourseId, 10),
@@ -226,7 +226,7 @@ const AdminQuizzes = () => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const adminUserId = localStorage.getItem('adminUserId') || 2;
+      const adminUserId = localStorage.getItem('adminUserId') || localStorage.getItem('userId') || 2;
       const payload = {
         user_id: parseInt(adminUserId, 10),
         quiz_id: parseInt(quizIdForQuestion, 10),

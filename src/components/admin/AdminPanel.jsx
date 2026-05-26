@@ -24,6 +24,8 @@ const AdminPanel = () => {
     localStorage.removeItem('isLoggedIn');
     localStorage.removeItem('isStudentLoggedIn');
     localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminUserId');
+    localStorage.removeItem('userId');
     window.location.hash = '';
     window.location.reload();
   };

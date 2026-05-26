@@ -90,7 +90,8 @@ const AdminLogin = ({ onLoginSuccess }) => {
         }
         
         if (returnedUserId) {
-           localStorage.setItem('adminUserId', returnedUserId);
+           localStorage.setItem('adminUserId', returnedUserId.toString());
+           localStorage.setItem('userId', returnedUserId.toString());
         }
 
         onLoginSuccess();
