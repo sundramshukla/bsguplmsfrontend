@@ -4,6 +4,7 @@ import AdminLessons from './AdminLessons';
 import AdminProfile from './AdminProfile';
 import AdminAnalytics from './AdminAnalytics';
 import AdminQuizzes from './AdminQuizzes';
+import AdminTemplates from './AdminTemplates';
 
 const AdminDashboard = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState('analytics');
@@ -92,6 +93,12 @@ const AdminDashboard = ({ onLogout }) => {
           >
             <span>👤</span> Profile
           </button>
+          <button 
+            onClick={() => handleTabClick('templates')}
+             className={`w-full text-left px-5 py-4 rounded-xl font-semibold transition-all duration-200 flex items-center gap-3 ${activeTab === 'templates' ? 'bg-[#7c3aed] text-white shadow-lg shadow-violet-500/30 translate-x-1' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+          >
+            <span>📜</span> Certificate Templates
+          </button>
         </div>
 
         <div className="p-6 border-t border-slate-700/50 bg-slate-900/30 mt-auto hidden md:block">
@@ -109,6 +116,7 @@ const AdminDashboard = ({ onLogout }) => {
             {activeTab === 'lessons' && <AdminLessons />}
             {activeTab === 'quizzes' && <AdminQuizzes />}
             {activeTab === 'profile' && <AdminProfile />}
+            {activeTab === 'templates' && <AdminTemplates />}
         </div>
       </div>
     </div>

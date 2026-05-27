@@ -133,7 +133,7 @@ const StudentDashboard = ({ onLogout }) => {
       {/* Main Content */}
       <div className="flex-grow overflow-y-auto relative w-full h-full bg-slate-50">
         <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-            {activeTab === 'analytics' && <StudentAnalytics />}
+            {activeTab === 'analytics' && <StudentAnalytics onNavigate={handleTabClick} />}
             {activeTab === 'enrolled' && <StudentEnrolledCourses />}
             {activeTab === 'dept_org' && <StudentDepartmentCourses department="organisation" title="Organization Department" />}
             {activeTab === 'dept_training' && <StudentDepartmentCourses department="training" title="Training Department" />}

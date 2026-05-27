@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const StudentAnalytics = () => {
+const StudentAnalytics = ({ onNavigate }) => {
   const [stats, setStats] = useState({
     coursesEnrolled: 0,
     coursesCompleted: 0,
@@ -37,12 +37,15 @@ const StudentAnalytics = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-4 hover:shadow-md transition-shadow">
-          <div className="w-14 h-14 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center text-2xl">
+        <div 
+          onClick={() => onNavigate && onNavigate('enrolled')}
+          className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-4 hover:shadow-md hover:border-emerald-300 hover:bg-emerald-50/5 transition-all cursor-pointer group"
+        >
+          <div className="w-14 h-14 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
             📚
           </div>
           <div>
-            <p className="text-sm font-medium text-slate-500">Enrolled Courses</p>
+            <p className="text-sm font-semibold text-slate-500 group-hover:text-emerald-600 transition-colors">Enrolled Courses</p>
             <h3 className="text-2xl font-bold text-slate-800">{stats.coursesEnrolled}</h3>
           </div>
         </div>
