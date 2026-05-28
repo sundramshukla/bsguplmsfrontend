@@ -62,27 +62,39 @@ const AdminQuizzes = () => {
 
   const [allQuizzes, setAllQuizzes] = useState([]);
   const [quizzesLoading, setQuizzesLoading] = useState(false);
+  const [filterCourseId, setFilterCourseId] = useState('all');
 
   const fetchAllExistingQuizzes = async (coursesList) => {
     setQuizzesLoading(true);
     const quizzesFound = [];
     try {
-      // Query Quiz IDs 1 to 50 in parallel
-      const idList = Array.from({ length: 50 }, (_, i) => i + 1);
-      const promises = idList.map(async (qId) => {
+      const promises = coursesList.map(async (course) => {
+        const cachedQuizId = localStorage.getItem(`quiz_id_course_${course.id}`);
+        const targetQuizId = cachedQuizId || course.id;
+        
         try {
-          const res = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?quiz_id=${qId}`);
+          // Try fetching by targetQuizId (which is quiz ID)
+          let res = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?quiz_id=${targetQuizId}`);
+          if (!res.ok) {
+            // Try fetching by course_id fallback
+            res = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?course_id=${course.id}`);
+          }
+          
           if (res.ok) {
             const data = await res.json();
             const quizObj = data.title ? data : (data.data || {});
             if (quizObj && quizObj.title) {
               const parsedQuiz = parseQuizResponse(data);
-              const courseId = quizObj.course_id || data.course_id || qId;
-              const courseTitle = coursesList.find(c => c.id.toString() === courseId.toString())?.title || `Course #${courseId}`;
+              const qId = quizObj.id || quizObj.quiz_id || targetQuizId;
+              
+              // Cache it
+              localStorage.setItem(`quiz_id_course_${course.id}`, qId.toString());
+
               return {
                 id: qId.toString(),
+                courseId: course.id.toString(),
                 title: parsedQuiz?.title || quizObj.title || `Quiz #${qId}`,
-                courseTitle: courseTitle,
+                courseTitle: course.title,
                 total_marks: quizObj.total_marks || data.total_marks || 100,
                 passing_marks: parsedQuiz?.passing_marks || quizObj.passing_marks || 60,
                 duration: parsedQuiz?.duration || quizObj.duration || 30,
@@ -138,12 +150,20 @@ const AdminQuizzes = () => {
         const data = await res.json();
         const quizObj = data.title ? data : (data.data || {});
         if (quizObj && quizObj.title) {
-          setExistingQuiz({
+          const parsed = parseQuizResponse(data);
+          const foundQuiz = {
             id: targetQuizId,
-            title: quizObj.title || "Course Final Quiz",
-            total_marks: quizObj.total_marks || 100,
-            passing_marks: quizObj.passing_marks || 60,
-            duration: quizObj.duration || 30
+            title: parsed?.title || quizObj.title || "Course Final Quiz",
+            total_marks: quizObj.total_marks || data.total_marks || 100,
+            passing_marks: parsed?.passing_marks || quizObj.passing_marks || 60,
+            duration: parsed?.duration || quizObj.duration || 30
+          };
+          setExistingQuiz(foundQuiz);
+          setQuizForm({
+            title: foundQuiz.title,
+            total_marks: foundQuiz.total_marks,
+            passing_marks: foundQuiz.passing_marks,
+            duration: foundQuiz.duration
           });
           setQuizIdForQuestion(targetQuizId.toString());
           setCheckingQuiz(false);
@@ -158,12 +178,20 @@ const AdminQuizzes = () => {
         const quizObj = data.title ? data : (data.data || {});
         if (quizObj && quizObj.title) {
           const qId = quizObj.id || quizObj.quiz_id || courseId;
-          setExistingQuiz({
+          const parsed = parseQuizResponse(data);
+          const foundQuiz = {
             id: qId,
-            title: quizObj.title || "Course Final Quiz",
-            total_marks: quizObj.total_marks || 100,
-            passing_marks: quizObj.passing_marks || 60,
-            duration: quizObj.duration || 30
+            title: parsed?.title || quizObj.title || "Course Final Quiz",
+            total_marks: quizObj.total_marks || data.total_marks || 100,
+            passing_marks: parsed?.passing_marks || quizObj.passing_marks || 60,
+            duration: parsed?.duration || quizObj.duration || 30
+          };
+          setExistingQuiz(foundQuiz);
+          setQuizForm({
+            title: foundQuiz.title,
+            total_marks: foundQuiz.total_marks,
+            passing_marks: foundQuiz.passing_marks,
+            duration: foundQuiz.duration
           });
           setQuizIdForQuestion(qId.toString());
           localStorage.setItem(`quiz_id_course_${courseId}`, qId.toString());
@@ -174,6 +202,15 @@ const AdminQuizzes = () => {
     } catch (err) {
       console.error("Failed to check existing quiz:", err);
     }
+
+    // Default values if no existing quiz found
+    const courseTitle = courses.find(c => c.id.toString() === courseId.toString())?.title || 'Course';
+    setQuizForm({
+      title: `${courseTitle} Final Quiz`,
+      total_marks: 100,
+      passing_marks: 60,
+      duration: 30
+    });
 
     const cachedQuizId = localStorage.getItem(`quiz_id_course_${courseId}`);
     if (cachedQuizId) {
@@ -201,6 +238,32 @@ const AdminQuizzes = () => {
     setQuizForm({ ...quizForm, [e.target.name]: e.target.value });
   };
 
+  const handleEditQuizFromList = (quiz) => {
+    if (quiz.courseId) {
+      setSelectedCourseId(quiz.courseId);
+    } else {
+      const foundCourse = courses.find(c => c.title === quiz.courseTitle);
+      if (foundCourse) {
+        setSelectedCourseId(foundCourse.id.toString());
+      }
+    }
+    setQuizForm({
+      title: quiz.title,
+      total_marks: quiz.total_marks,
+      passing_marks: quiz.passing_marks,
+      duration: quiz.duration
+    });
+    setExistingQuiz({
+      id: quiz.id,
+      title: quiz.title,
+      total_marks: quiz.total_marks,
+      passing_marks: quiz.passing_marks,
+      duration: quiz.duration
+    });
+    setQuizIdForQuestion(quiz.id.toString());
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleQuestionChange = (e) => {
     setQuestionForm({ ...questionForm, [e.target.name]: e.target.value });
   };
@@ -208,6 +271,7 @@ const AdminQuizzes = () => {
   const handleCreateQuiz = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+    const isEditing = !!existingQuiz;
     try {
       const adminUserId = localStorage.getItem('adminUserId') || localStorage.getItem('userId') || 2;
       const payload = {
@@ -219,16 +283,22 @@ const AdminQuizzes = () => {
         duration: parseInt(quizForm.duration, 10)
       };
 
+      if (isEditing) {
+        payload.id = parseInt(existingQuiz.id, 10);
+        payload.quiz_id = parseInt(existingQuiz.id, 10);
+      }
+
+      const method = isEditing ? 'PUT' : 'POST';
       const res = await fetch(`${BASE_URL}/bsgupadmin/create-quiz/`, {
-        method: 'POST',
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       const data = await res.json();
       
       if (res.ok || data.success) {
-        alert(data.message || data.success || "Quiz Created Successfully!");
-        const newQuizId = (data.data?.quiz_id || data.quiz_id || data.id || "1").toString();
+        alert(data.message || data.success || (isEditing ? "Quiz Updated Successfully!" : "Quiz Created Successfully!"));
+        const newQuizId = (data.data?.quiz_id || data.quiz_id || data.id || (isEditing ? existingQuiz.id : "1")).toString();
         localStorage.setItem(`quiz_id_course_${selectedCourseId}`, newQuizId);
         setQuizIdForQuestion(newQuizId);
         setExistingQuiz({
@@ -239,26 +309,18 @@ const AdminQuizzes = () => {
           duration: quizForm.duration
         });
 
-        // Add to dropdown list immediately
-        const newQuizObj = {
-          id: newQuizId,
-          title: quizForm.title,
-          courseTitle: courses.find(c => c.id.toString() === selectedCourseId.toString())?.title || `Course #${selectedCourseId}`,
-          total_marks: parseInt(quizForm.total_marks, 10),
-          passing_marks: parseInt(quizForm.passing_marks, 10),
-          duration: parseInt(quizForm.duration, 10),
-          questions: []
-        };
-        setAllQuizzes(prev => {
-          if (prev.some(q => q.id === newQuizId)) return prev;
-          return [...prev, newQuizObj];
-        });
+        // Reload existing quizzes list to show updated details
+        const coursesRes = await fetch(`${BASE_URL}/bsgupadmin/createcourse/`);
+        const coursesData = await coursesRes.json();
+        if (coursesData.success && coursesData.data) {
+          fetchAllExistingQuizzes(coursesData.data);
+        }
       } else {
-        alert(data.error || "Failed to create quiz.");
+        alert(data.error || "Failed to save quiz.");
       }
     } catch (err) {
       console.error(err);
-      alert("Error creating quiz.");
+      alert("Error saving quiz.");
     } finally {
       setIsLoading(false);
     }
@@ -572,13 +634,25 @@ const AdminQuizzes = () => {
               />
             </div>
 
-            <button 
-              type="submit" 
-              disabled={isLoading}
-              className="w-full bg-[#7c3aed] text-white font-bold py-3 rounded-xl hover:bg-[#6d28d9] transition-colors disabled:opacity-50"
-            >
-              {isLoading ? 'Creating...' : 'Create Quiz API'}
-            </button>
+            <div className="flex gap-3">
+              <button 
+                type="submit" 
+                disabled={isLoading}
+                className="flex-1 bg-[#7c3aed] text-white font-bold py-3 rounded-xl hover:bg-[#6d28d9] transition-colors disabled:opacity-50"
+              >
+                {isLoading ? 'Saving...' : existingQuiz ? 'Update Quiz Parameters' : 'Create Quiz'}
+              </button>
+              {existingQuiz && (
+                <button 
+                  type="button"
+                  onClick={() => handleDeleteQuiz(existingQuiz.id)}
+                  disabled={isLoading}
+                  className="bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold px-5 py-3 rounded-xl transition-colors border border-rose-200 disabled:opacity-50"
+                >
+                  Delete
+                </button>
+              )}
+            </div>
           </form>
         </div>
 
@@ -701,9 +775,26 @@ const AdminQuizzes = () => {
 
       {/* Premium Dashboard section: All Quizzes & Questions */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-        <div>
-          <h3 className="text-2xl font-bold text-slate-800">All Quizzes & Created Questions</h3>
-          <p className="text-sm text-slate-500">View and manage all course quizzes and their respective MCQ questions.</p>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-4">
+          <div>
+            <h3 className="text-2xl font-bold text-slate-800">All Quizzes & Created Questions</h3>
+            <p className="text-sm text-slate-500 mt-1">View and manage all course quizzes and their respective MCQ questions.</p>
+          </div>
+          
+          {/* Dropdown to Filter by Course/Project */}
+          <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
+            <span className="text-sm font-semibold text-slate-600 whitespace-nowrap">🔍 Filter by Course:</span>
+            <select
+              value={filterCourseId}
+              onChange={(e) => setFilterCourseId(e.target.value)}
+              className="border-2 border-slate-200 rounded-xl p-2 font-medium text-sm text-slate-700 focus:border-[#7c3aed] focus:outline-none min-w-[200px] max-w-xs bg-white cursor-pointer"
+            >
+              <option value="all">✨ Show All Courses</option>
+              {courses.map(c => (
+                <option key={c.id} value={c.id.toString()}>{c.title}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {quizzesLoading ? (
@@ -711,116 +802,136 @@ const AdminQuizzes = () => {
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#7c3aed]"></div>
             <span className="ml-3 text-slate-600 font-medium">Loading Quizzes & Questions...</span>
           </div>
-        ) : allQuizzes.length > 0 ? (
-          <div className="grid grid-cols-1 gap-8">
-            {allQuizzes.map(quiz => (
-              <div key={quiz.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-6 hover:shadow-md transition-shadow flex flex-col justify-between">
-                <div className="space-y-4">
-                  {/* Quiz Header */}
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-                    <div>
-                      <span className="bg-purple-100 text-purple-800 text-xs font-bold px-2.5 py-1 rounded-full border border-purple-200 uppercase tracking-wider">
-                        Quiz ID: {quiz.id}
-                      </span>
-                      <h4 className="text-xl font-bold text-slate-800 mt-2">{quiz.title}</h4>
-                      <p className="text-xs text-slate-500 font-medium mt-1">📚 {quiz.courseTitle}</p>
+        ) : allQuizzes.length > 0 ? (() => {
+          const filteredQuizzes = filterCourseId === 'all' 
+            ? allQuizzes 
+            : allQuizzes.filter(q => q.courseId?.toString() === filterCourseId.toString());
+
+          if (filteredQuizzes.length === 0) {
+            return (
+              <div className="bg-slate-50 border border-slate-200 text-slate-500 rounded-xl p-12 text-center font-semibold text-lg">
+                No quiz created for the selected course.
+              </div>
+            );
+          }
+
+          return (
+            <div className="grid grid-cols-1 gap-8">
+              {filteredQuizzes.map(quiz => (
+                <div key={quiz.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-6 hover:shadow-md transition-shadow flex flex-col justify-between">
+                  <div className="space-y-4">
+                    {/* Quiz Header */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+                      <div>
+                        <span className="bg-purple-100 text-purple-800 text-xs font-bold px-2.5 py-1 rounded-full border border-purple-200 uppercase tracking-wider">
+                          Quiz ID: {quiz.id}
+                        </span>
+                        <h4 className="text-xl font-bold text-slate-800 mt-2">{quiz.title}</h4>
+                        <p className="text-xs text-slate-500 font-medium mt-1">📚 {quiz.courseTitle}</p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          onClick={() => handleEditQuizFromList(quiz)}
+                          className="bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold px-3 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-sm shadow-indigo-500/10"
+                        >
+                          <span>✏️</span> Edit Quiz Params
+                        </button>
+                        <button
+                          onClick={() => {
+                            setActiveAddQuestionQuizId(quiz.id);
+                            setModalQuestionForm({
+                              question: '',
+                              option1: '',
+                              option2: '',
+                              option3: '',
+                              option4: '',
+                              correct_answer: ''
+                            });
+                          }}
+                          className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold px-3 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-sm shadow-emerald-500/10"
+                        >
+                          <span>➕</span> Add Question
+                        </button>
+                        <button
+                          onClick={() => handleDeleteQuiz(quiz.id)}
+                          className="bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold px-3 py-2 rounded-lg transition-colors flex items-center gap-1 border border-rose-200"
+                        >
+                          <span>🗑️</span> Delete Quiz
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => {
-                          setActiveAddQuestionQuizId(quiz.id);
-                          setModalQuestionForm({
-                            question: '',
-                            option1: '',
-                            option2: '',
-                            option3: '',
-                            option4: '',
-                            correct_answer: ''
-                          });
-                        }}
-                        className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold px-3 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-sm shadow-emerald-500/10"
-                      >
-                        <span>➕</span> Add Question
-                      </button>
-                      <button
-                        onClick={() => handleDeleteQuiz(quiz.id)}
-                        className="bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold px-3 py-2 rounded-lg transition-colors flex items-center gap-1 border border-rose-200"
-                      >
-                        <span>🗑️</span> Delete Quiz
-                      </button>
+                    {/* Quiz Parameters */}
+                    <div className="flex flex-wrap gap-4 text-xs font-semibold text-slate-600 bg-white border border-slate-200 px-4 py-2.5 rounded-xl">
+                      <div>⏱️ <span className="text-slate-700">{quiz.duration} Minutes</span></div>
+                      <div className="text-slate-300">|</div>
+                      <div>🎯 Passing Marks: <span className="text-emerald-600">{quiz.passing_marks}</span></div>
+                      <div className="text-slate-300">|</div>
+                      <div>💯 Total Marks: <span className="text-slate-800">{quiz.total_marks}</span></div>
+                      <div className="text-slate-300">|</div>
+                      <div>📝 Questions count: <span className="text-slate-800">{(quiz.questions || []).length}</span></div>
                     </div>
-                  </div>
 
-                  {/* Quiz Parameters */}
-                  <div className="flex flex-wrap gap-4 text-xs font-semibold text-slate-600 bg-white border border-slate-200 px-4 py-2.5 rounded-xl">
-                    <div>⏱️ <span className="text-slate-700">{quiz.duration} Minutes</span></div>
-                    <div className="text-slate-300">|</div>
-                    <div>🎯 Passing Marks: <span className="text-emerald-600">{quiz.passing_marks}</span></div>
-                    <div className="text-slate-300">|</div>
-                    <div>💯 Total Marks: <span className="text-slate-800">{quiz.total_marks}</span></div>
-                    <div className="text-slate-300">|</div>
-                    <div>📝 Questions count: <span className="text-slate-800">{(quiz.questions || []).length}</span></div>
-                  </div>
+                    {/* Questions List */}
+                    <div className="space-y-4 pt-2">
+                      <h5 className="text-sm font-bold text-slate-700 uppercase tracking-wider">MCQ Questions:</h5>
+                      
+                      {(!quiz.questions || quiz.questions.length === 0) ? (
+                        <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-4 text-sm font-medium text-center">
+                          ⚠️ No questions added to this quiz yet! Use the "Add Question" button above to add one.
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 gap-4">
+                          {quiz.questions.map((quest, qIdx) => {
+                            const questionId = quest.id || quest.question_id || quest.order || qIdx;
+                            return (
+                              <div key={questionId} className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm relative group text-left">
+                                <div className="flex justify-between items-start gap-4 mb-3">
+                                  <h6 className="font-bold text-slate-800 text-sm sm:text-base leading-snug">
+                                    Q{qIdx + 1}: {quest.question}
+                                  </h6>
+                                  <button
+                                    onClick={() => handleDeleteQuestion(quiz.id, questionId)}
+                                    className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1.5 rounded-lg transition-colors border border-transparent hover:border-rose-100 flex items-center justify-center shrink-0"
+                                    title="Delete Question"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                                    </svg>
+                                  </button>
+                                </div>
 
-                  {/* Questions List */}
-                  <div className="space-y-4 pt-2">
-                    <h5 className="text-sm font-bold text-slate-700 uppercase tracking-wider">MCQ Questions:</h5>
-                    
-                    {(!quiz.questions || quiz.questions.length === 0) ? (
-                      <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-4 text-sm font-medium text-center">
-                        ⚠️ No questions added to this quiz yet! Use the "Add Question" button above to add one.
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 gap-4">
-                        {quiz.questions.map((quest, qIdx) => {
-                          const questionId = quest.id || quest.question_id || quest.order || qIdx;
-                          return (
-                            <div key={questionId} className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm relative group text-left">
-                              <div className="flex justify-between items-start gap-4 mb-3">
-                                <h6 className="font-bold text-slate-800 text-sm sm:text-base leading-snug">
-                                  Q{qIdx + 1}: {quest.question}
-                                </h6>
-                                <button
-                                  onClick={() => handleDeleteQuestion(quiz.id, questionId)}
-                                  className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1.5 rounded-lg transition-colors border border-transparent hover:border-rose-100 flex items-center justify-center shrink-0"
-                                  title="Delete Question"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                                  </svg>
-                                </button>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs sm:text-sm">
+                                  {[quest.option1, quest.option2, quest.option3, quest.option4].map((opt, oIdx) => {
+                                    const isCorrect = opt === quest.correct_answer;
+                                    return (
+                                      <div
+                                        key={oIdx}
+                                        className={`px-3 py-2 rounded-lg border font-semibold ${
+                                          isCorrect
+                                            ? 'bg-emerald-50 border-emerald-500 text-emerald-700 font-bold ring-2 ring-emerald-500/10'
+                                            : 'bg-slate-50 border-slate-200 text-slate-600'
+                                        }`}
+                                      >
+                                        <span className="mr-1.5">{String.fromCharCode(65 + oIdx)}.</span> {opt}
+                                        {isCorrect && <span className="ml-1.5 text-xs text-emerald-600 font-extrabold">(Correct)</span>}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                               </div>
-
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs sm:text-sm">
-                                {[quest.option1, quest.option2, quest.option3, quest.option4].map((opt, oIdx) => {
-                                  const isCorrect = opt === quest.correct_answer;
-                                  return (
-                                    <div
-                                      key={oIdx}
-                                      className={`px-3 py-2 rounded-lg border font-semibold ${
-                                        isCorrect
-                                          ? 'bg-emerald-50 border-emerald-500 text-emerald-700 font-bold ring-2 ring-emerald-500/10'
-                                          : 'bg-slate-50 border-slate-200 text-slate-600'
-                                      }`}
-                                    >
-                                      <span className="mr-1.5">{String.fromCharCode(65 + oIdx)}.</span> {opt}
-                                      {isCorrect && <span className="ml-1.5 text-xs text-emerald-600 font-extrabold">(Correct)</span>}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        ) : (
+              ))}
+            </div>
+          );
+        })() : (
           <div className="bg-slate-50 border border-slate-200 text-slate-500 rounded-xl p-12 text-center font-semibold text-lg">
             No quizzes created in the system yet.
           </div>

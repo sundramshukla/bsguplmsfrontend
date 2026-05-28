@@ -162,7 +162,11 @@ const StudentEnrolledCourses = () => {
   const [activeCourse, setActiveCourse] = useState(null);
   
   // Lesson Progression states
-  const [currentPart, setCurrentPart] = useState(1); // 1, 2, or 3
+  const [currentPart, setCurrentPart] = useState(1); // currently active lesson/part index
+  const [maxUnlockedPart, setMaxUnlockedPart] = useState(1); // maximum unlocked lesson/part index
+  const [activeSubLessonIndex, setActiveSubLessonIndex] = useState(-1); // -1 = main video, otherwise sub-lesson index
+  const [viewMode, setViewMode] = useState('video'); // 'video' or 'notes'
+  const [expandedLessons, setExpandedLessons] = useState({ 1: true });
   const [quizStarted, setQuizStarted] = useState(false);
   const [quizLoading, setQuizLoading] = useState(false);
   const [lessons, setLessons] = useState([]);
@@ -426,6 +430,28 @@ const StudentEnrolledCourses = () => {
     }
   }, [activeCourse]);
 
+  useEffect(() => {
+    if (activeCourse) {
+      const userId = localStorage.getItem('userId') || 'guest';
+      const key = `unlockedPart_${userId}_${activeCourse.id}`;
+      const savedProgress = parseInt(localStorage.getItem(key) || '1', 10);
+      setMaxUnlockedPart(savedProgress);
+      setCurrentPart(savedProgress);
+      setExpandedLessons({ [savedProgress]: true });
+      setActiveSubLessonIndex(-1);
+      setViewMode('video');
+    }
+  }, [activeCourse]);
+
+  const updateUnlockedProgress = (newVal) => {
+    if (activeCourse) {
+      const userId = localStorage.getItem('userId') || 'guest';
+      const key = `unlockedPart_${userId}_${activeCourse.id}`;
+      localStorage.setItem(key, newVal.toString());
+      setMaxUnlockedPart(newVal);
+    }
+  };
+
   // Fallback Quiz questions if API doesn't return any
   const fallbackQuiz = {
     title: "Scouting & Guiding Core Examination",
@@ -617,17 +643,51 @@ const StudentEnrolledCourses = () => {
   };
 
   const handleNextPart = () => {
-    const activeParts = lessons.length > 0 ? lessons : [1, 2, 3];
+    const activeParts = lessons.length > 0 ? lessons : fallbackParts;
+    
+    // If viewing a sub-lesson and there are more sub-lessons left:
+    if (activeSubLessonIndex !== null && activeSubLessonIndex >= 0) {
+      const lesson = activeParts[currentPart - 1];
+      if (lesson.sub_lessons && activeSubLessonIndex < lesson.sub_lessons.length - 1) {
+        // Go to next sub-lesson
+        setActiveSubLessonIndex(activeSubLessonIndex + 1);
+        setViewMode('video');
+        return;
+      }
+    }
+    
+    // Otherwise, advance to the next main lesson
     if (currentPart < activeParts.length) {
-      setCurrentPart(currentPart + 1);
+      const nextPartNum = currentPart + 1;
+      if (nextPartNum > maxUnlockedPart) {
+        updateUnlockedProgress(nextPartNum);
+      }
+      setCurrentPart(nextPartNum);
+      setActiveSubLessonIndex(-1); // Reset to main lesson video
+      setViewMode('video');
+      
+      // Auto-expand the newly unlocked lesson dropdown
+      setExpandedLessons(prev => ({
+        ...prev,
+        [nextPartNum]: true
+      }));
     } else {
-      setCurrentPart(activeParts.length + 1);
+      // Unlock quiz!
+      const quizPartNum = activeParts.length + 1;
+      if (quizPartNum > maxUnlockedPart) {
+        updateUnlockedProgress(quizPartNum);
+      }
+      setCurrentPart(quizPartNum);
     }
   };
 
   const resetStudyPanel = () => {
     setActiveCourse(null);
     setCurrentPart(1);
+    setMaxUnlockedPart(1);
+    setActiveSubLessonIndex(-1);
+    setViewMode('video');
+    setExpandedLessons({ 1: true });
     setQuizStarted(false);
     setQuizResult(null);
     setSelectedAnswers({});
@@ -655,6 +715,28 @@ const StudentEnrolledCourses = () => {
     ];
 
     const activeParts = lessons.length > 0 ? lessons : fallbackParts;
+    const currentLesson = activeParts[currentPart - 1];
+    
+    // Get active content information
+    let activeTitle = "";
+    let activeDescription = "";
+    let activeVideoUrl = "";
+    let activePartId = "";
+
+    if (currentLesson) {
+      if (activeSubLessonIndex !== null && activeSubLessonIndex >= 0 && currentLesson.sub_lessons && currentLesson.sub_lessons[activeSubLessonIndex]) {
+        const subLesson = currentLesson.sub_lessons[activeSubLessonIndex];
+        activeTitle = subLesson.title || `Sub-lesson ${activeSubLessonIndex + 1}`;
+        activeDescription = subLesson.description || "No description provided.";
+        activeVideoUrl = subLesson.youtube_url || subLesson.videoUrl || "";
+        activePartId = `${currentPart}_sub_${activeSubLessonIndex}`;
+      } else {
+        activeTitle = currentLesson.title;
+        activeDescription = currentLesson.description || "No description provided.";
+        activeVideoUrl = currentLesson.youtube_url || currentLesson.videoUrl || "";
+        activePartId = `${currentPart}`;
+      }
+    }
 
     return (
       <div className="p-6 max-w-6xl mx-auto text-left relative">
@@ -669,69 +751,266 @@ const StudentEnrolledCourses = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Sidebar */}
-          <div className="lg:col-span-1 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm h-fit space-y-2">
+          <div className="lg:col-span-1 bg-white border border-slate-200 rounded-2xl shadow-sm h-fit overflow-hidden flex flex-col">
             
-            {activeParts.map((part, index) => {
-              const num = index + 1;
-              return (
-                <button
-                  key={num}
-                  disabled={currentPart < num}
-                  onClick={() => { if(currentPart >= num) setCurrentPart(num); }}
-                  className={`w-full text-left px-4 py-3 rounded-xl font-semibold flex items-center justify-between transition-all ${
-                    currentPart === num 
-                      ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' 
-                      : currentPart > num 
-                        ? 'text-slate-700 bg-slate-50 hover:bg-slate-100'
-                        : 'text-slate-300 cursor-not-allowed bg-slate-50/50'
-                  }`}
-                >
-                  <span className="truncate max-w-[85%]">{part.title}</span>
-                  <span>{currentPart > num ? '✅' : '🔒'}</span>
-                </button>
-              );
-            })}
+            {/* Project / Course Name at the Top */}
+            <div className="p-5 border-b border-slate-100 bg-slate-50/50">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="text-lg">⚜️</span>
+                <span className="text-[10px] font-bold text-emerald-600 tracking-wider uppercase">Enrolled Course</span>
+              </div>
+              <h3 className="text-base font-extrabold text-slate-800 leading-snug break-words">
+                {activeCourse.title}
+              </h3>
+            </div>
 
-            <button
-              disabled={currentPart < activeParts.length + 1}
-              onClick={() => setCurrentPart(activeParts.length + 1)}
-              className={`w-full text-left px-4 py-3 rounded-xl font-bold flex items-center justify-between transition-all ${
-                currentPart === activeParts.length + 1
-                  ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' 
-                  : 'text-slate-300 cursor-not-allowed bg-slate-50/50'
-              }`}
-            >
-              <span>🎓 Final Quiz</span>
-              <span>📝</span>
-            </button>
+            {/* Lessons Dropdowns List */}
+            <div className="p-3 space-y-2 max-h-[500px] overflow-y-auto">
+              {activeParts.map((part, index) => {
+                const num = index + 1;
+                const isUnlocked = maxUnlockedPart >= num;
+                const isExpanded = !!expandedLessons[num];
+                const isActiveLesson = currentPart === num;
+                const subLessonsList = part.sub_lessons || [];
+
+                return (
+                  <div key={num} className="border border-slate-100 rounded-xl overflow-hidden">
+                    {/* Accordion Header */}
+                    <button
+                      disabled={!isUnlocked}
+                      onClick={() => {
+                        setExpandedLessons(prev => ({
+                          ...prev,
+                          [num]: !prev[num]
+                        }));
+                      }}
+                      className={`w-full text-left px-4 py-3 font-semibold flex items-center justify-between transition-all ${
+                        !isUnlocked 
+                          ? 'text-slate-300 cursor-not-allowed bg-slate-50/50' 
+                          : isActiveLesson
+                            ? 'bg-emerald-50 text-emerald-800 border-l-4 border-emerald-500'
+                            : 'text-slate-700 bg-slate-50 hover:bg-slate-100/80'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className="text-xs transition-transform duration-200 shrink-0">
+                          {isExpanded ? '▼' : '▶'}
+                        </span>
+                        <span className="truncate text-sm font-bold">{part.title}</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                        {maxUnlockedPart > num ? (
+                          <span className="text-emerald-500 text-xs">✅</span>
+                        ) : !isUnlocked ? (
+                          <span className="text-slate-400 text-xs">🔒</span>
+                        ) : (
+                          <span className="text-amber-500 text-xs">📖</span>
+                        )}
+                      </div>
+                    </button>
+
+                    {/* Accordion Content (Links) */}
+                    {isExpanded && isUnlocked && (
+                      <div className="bg-white border-t border-slate-50 pl-3 pr-2 py-2 space-y-1 border-l-2 border-slate-100 ml-4 my-1">
+                        
+                        {/* Main Video Link */}
+                        <button
+                          onClick={() => {
+                            setCurrentPart(num);
+                            setActiveSubLessonIndex(-1);
+                            setViewMode('video');
+                          }}
+                          className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
+                            isActiveLesson && activeSubLessonIndex === -1 && viewMode === 'video'
+                              ? 'bg-emerald-500 text-white shadow-sm'
+                              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                          }`}
+                        >
+                          <span className="text-[14px]">🎥</span>
+                          <span className="truncate">Lesson Video</span>
+                        </button>
+
+                        {/* Main Notes / Study Material Link */}
+                        <button
+                          onClick={() => {
+                            setCurrentPart(num);
+                            setActiveSubLessonIndex(-1);
+                            setViewMode('notes');
+                          }}
+                          className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
+                            isActiveLesson && activeSubLessonIndex === -1 && viewMode === 'notes'
+                              ? 'bg-emerald-500 text-white shadow-sm'
+                              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                          }`}
+                        >
+                          <span className="text-[14px]">📄</span>
+                          <span className="truncate">Study Material</span>
+                        </button>
+
+                        {/* Sub-lessons (if any exist) */}
+                        {subLessonsList.map((sub, sIdx) => {
+                          const isSubActive = isActiveLesson && activeSubLessonIndex === sIdx;
+                          return (
+                            <div key={sIdx} className="space-y-0.5 pt-1 border-t border-dashed border-slate-100 mt-1">
+                              {/* Sub Video */}
+                              <button
+                                onClick={() => {
+                                  setCurrentPart(num);
+                                  setActiveSubLessonIndex(sIdx);
+                                  setViewMode('video');
+                                }}
+                                className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
+                                  isSubActive && viewMode === 'video'
+                                    ? 'bg-emerald-500 text-white shadow-sm'
+                                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 pl-4'
+                                }`}
+                              >
+                                <span className="text-[12px]">▶️</span>
+                                <span className="truncate">{sub.title || `Part ${sIdx + 1}`}</span>
+                              </button>
+
+                              {/* Sub Notes */}
+                              <button
+                                onClick={() => {
+                                  setCurrentPart(num);
+                                  setActiveSubLessonIndex(sIdx);
+                                  setViewMode('notes');
+                                }}
+                                className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
+                                  isSubActive && viewMode === 'notes'
+                                    ? 'bg-emerald-500 text-white shadow-sm'
+                                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 pl-4'
+                                }`}
+                              >
+                                <span className="text-[12px]">📄</span>
+                                <span className="truncate">Notes: {sub.title || `Part ${sIdx + 1}`}</span>
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Final Quiz Button */}
+              <button
+                disabled={maxUnlockedPart < activeParts.length + 1}
+                onClick={() => setCurrentPart(activeParts.length + 1)}
+                className={`w-full text-left px-4 py-3 rounded-xl font-bold flex items-center justify-between transition-all border ${
+                  currentPart === activeParts.length + 1
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg border-transparent shadow-emerald-500/20' 
+                    : maxUnlockedPart >= activeParts.length + 1
+                      ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-100'
+                      : 'text-slate-300 cursor-not-allowed bg-slate-50/50 border-slate-200/50'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🎓</span>
+                  <span className="text-sm">Final Quiz</span>
+                </div>
+                <span>{maxUnlockedPart >= activeParts.length + 1 ? '📝' : '🔒'}</span>
+              </button>
+            </div>
           </div>
 
           {/* Main Video & Content */}
-          <div className="lg:col-span-3 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+          <div className="lg:col-span-3 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm min-h-[500px] flex flex-col justify-between">
             {lessonsLoading ? (
               <Loader message="Loading Course Modules..." />
             ) : currentPart <= activeParts.length ? (
-              <div className="space-y-6">
-                <h3 className="text-2xl font-bold text-slate-800">{activeParts[currentPart - 1].title}</h3>
-                
-                {/* Dynamic Tracking Video Player */}
-                <YouTubePlayer 
-                  url={activeParts[currentPart - 1].youtube_url || activeParts[currentPart - 1].videoUrl} 
-                  title={activeParts[currentPart - 1].title}
-                  courseId={activeCourse.id}
-                  partNum={currentPart}
-                  onVideoEnd={handleNextPart}
-                />
-
-                <p className="text-slate-600 leading-relaxed">{activeParts[currentPart - 1].description}</p>
-
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-between mt-4">
-                  <div className="flex items-center gap-2 text-slate-600 font-semibold text-sm">
-                    <span>📺</span>
-                    <span>Watch the entire video to complete this lesson and unlock the next module automatically.</span>
+              <div className="space-y-6 flex-grow">
+                {/* Header Row */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-slate-100 gap-3">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
+                      Lesson {currentPart} {activeSubLessonIndex >= 0 ? `• Part ${activeSubLessonIndex + 1}` : ''}
+                    </span>
+                    <h3 className="text-2xl font-black text-slate-800 mt-2 leading-tight">
+                      {activeTitle}
+                    </h3>
                   </div>
-                  <span className="text-emerald-500 font-bold text-sm bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">Auto-advancing Enabled</span>
+
+                  {/* Mode Toggles */}
+                  <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
+                    <button
+                      onClick={() => setViewMode('video')}
+                      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                        viewMode === 'video'
+                          ? 'bg-white text-emerald-700 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <span>🎥</span> Video
+                    </button>
+                    <button
+                      onClick={() => setViewMode('notes')}
+                      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                        viewMode === 'notes'
+                          ? 'bg-white text-emerald-700 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <span>📄</span> Study Notes
+                    </button>
+                  </div>
                 </div>
+
+                {viewMode === 'video' ? (
+                  <div className="space-y-6 animate-fadeIn">
+                    {/* Dynamic Tracking Video Player */}
+                    <YouTubePlayer 
+                      url={activeVideoUrl} 
+                      title={activeTitle}
+                      courseId={activeCourse.id}
+                      partNum={activePartId}
+                      onVideoEnd={handleNextPart}
+                    />
+
+                    <div className="bg-slate-50 border border-slate-150 rounded-xl p-5">
+                      <h4 className="text-sm font-bold text-slate-700 mb-2">About this video</h4>
+                      <p className="text-slate-600 leading-relaxed text-sm">{activeDescription}</p>
+                    </div>
+
+                    <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5 text-emerald-800 font-semibold text-sm">
+                        <span className="text-lg">📺</span>
+                        <span>Complete this module to auto-unlock the next learning objective.</span>
+                      </div>
+                      <span className="text-xs font-bold text-emerald-600 bg-emerald-100 px-3 py-1 rounded-full shrink-0">
+                        Auto-Advance Active
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-6 animate-fadeIn">
+                    {/* Beautiful Study Article Layout */}
+                    <div className="bg-gradient-to-br from-emerald-50/40 to-slate-50 border border-slate-150 rounded-2xl p-6 md:p-8 relative overflow-hidden shadow-inner">
+                      <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none select-none text-9xl">📖</div>
+                      
+                      <div className="prose max-w-none text-slate-700 leading-relaxed space-y-4">
+                        <h4 className="text-lg font-bold text-slate-800 flex items-center gap-2 border-b border-slate-200 pb-2">
+                          <span>📚</span> Syllabus Material & Reference Notes
+                        </h4>
+                        <p className="text-base text-slate-700 whitespace-pre-wrap leading-relaxed font-serif">
+                          {activeDescription}
+                        </p>
+                      </div>
+
+                      <div className="mt-8 pt-6 border-t border-slate-200/60 flex flex-wrap justify-between items-center gap-3">
+                        <span className="text-xs text-slate-400 font-medium">Read and master these concepts before taking the Final Examination.</span>
+                        <button
+                          onClick={() => window.print()}
+                          className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 font-bold px-4 py-2 rounded-xl text-xs transition-all shadow-sm flex items-center gap-1.5"
+                        >
+                          <span>🖨️</span> Print Notes
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               // Quiz Block
