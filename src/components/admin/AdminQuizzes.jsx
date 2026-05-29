@@ -13,12 +13,15 @@ const parseQuizResponse = (data) => {
     };
   }
   
-  if (data.data && (data.data.title || data.data.questions)) {
+  let qData = data.data;
+  if (Array.isArray(qData) && qData.length > 0) qData = qData[0];
+
+  if (qData && (qData.title || qData.questions)) {
     return {
-      title: data.data.title || "Course Final Quiz",
-      passing_marks: data.data.passing_marks || data.data.passing_mark || 60,
-      duration: data.data.duration || 30,
-      questions: data.data.questions || []
+      title: qData.title || "Course Final Quiz",
+      passing_marks: qData.passing_marks || qData.passing_mark || 60,
+      duration: qData.duration || 30,
+      questions: qData.questions || []
     };
   }
   
@@ -69,38 +72,48 @@ const AdminQuizzes = () => {
     const quizzesFound = [];
     try {
       const promises = coursesList.map(async (course) => {
-        const cachedQuizId = localStorage.getItem(`quiz_id_course_${course.id}`);
-        const targetQuizId = cachedQuizId || course.id;
-        
         try {
-          // Try fetching by targetQuizId (which is quiz ID)
-          let res = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?quiz_id=${targetQuizId}`);
-          if (!res.ok) {
-            // Try fetching by course_id fallback
-            res = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?course_id=${course.id}`);
-          }
-          
-          if (res.ok) {
-            const data = await res.json();
-            const quizObj = data.title ? data : (data.data || {});
-            if (quizObj && quizObj.title) {
-              const parsedQuiz = parseQuizResponse(data);
-              const qId = quizObj.id || quizObj.quiz_id || targetQuizId;
-              
-              // Cache it
-              localStorage.setItem(`quiz_id_course_${course.id}`, qId.toString());
+          const cachedQuizId = localStorage.getItem(`quiz_id_course_${course.id}`);
+          const targetQuizId = cachedQuizId || course.id;
 
-              return {
-                id: qId.toString(),
-                courseId: course.id.toString(),
-                title: parsedQuiz?.title || quizObj.title || `Quiz #${qId}`,
-                courseTitle: course.title,
-                total_marks: quizObj.total_marks || data.total_marks || 100,
-                passing_marks: parsedQuiz?.passing_marks || quizObj.passing_marks || 60,
-                duration: parsedQuiz?.duration || quizObj.duration || 30,
-                questions: parsedQuiz?.questions || []
-              };
+          let res = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?quiz_id=${targetQuizId}`);
+          let data = res.ok ? await res.json() : null;
+          
+          let quizObj = null;
+          if (data) {
+            if (data.title) quizObj = data;
+            else if (data.data && data.data.title) quizObj = data.data;
+            else if (Array.isArray(data.data) && data.data.length > 0 && data.data[0].title) quizObj = data.data[0];
+            else if (data.quiz && data.quiz.title) quizObj = data.quiz;
+          }
+
+          if (!quizObj || !quizObj.title) {
+            res = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?course_id=${course.id}`);
+            data = res.ok ? await res.json() : null;
+            if (data) {
+              if (data.title) quizObj = data;
+              else if (data.data && data.data.title) quizObj = data.data;
+              else if (Array.isArray(data.data) && data.data.length > 0 && data.data[0].title) quizObj = data.data[0];
+              else if (data.quiz && data.quiz.title) quizObj = data.quiz;
             }
+          }
+
+          if (quizObj && quizObj.title) {
+            const parsedQuiz = parseQuizResponse(data);
+            const qId = quizObj.id || quizObj.quiz_id || targetQuizId;
+            
+            localStorage.setItem(`quiz_id_course_${course.id}`, qId.toString());
+
+            return {
+              id: qId.toString(),
+              courseId: course.id.toString(),
+              title: parsedQuiz?.title || quizObj.title || `Quiz #${qId}`,
+              courseTitle: course.title,
+              total_marks: quizObj.total_marks || data.total_marks || 100,
+              passing_marks: parsedQuiz?.passing_marks || quizObj.passing_marks || 60,
+              duration: parsedQuiz?.duration || quizObj.duration || 30,
+              questions: parsedQuiz?.questions || (Array.isArray(quizObj.questions) ? quizObj.questions : [])
+            };
           }
         } catch (e) {
           // Ignore
@@ -145,59 +158,49 @@ const AdminQuizzes = () => {
       const cachedQuizId = localStorage.getItem(`quiz_id_course_${courseId}`);
       const targetQuizId = cachedQuizId || courseId;
 
-      const res = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?quiz_id=${targetQuizId}`);
-      if (res.ok) {
-        const data = await res.json();
-        const quizObj = data.title ? data : (data.data || {});
-        if (quizObj && quizObj.title) {
-          const parsed = parseQuizResponse(data);
-          const foundQuiz = {
-            id: targetQuizId,
-            title: parsed?.title || quizObj.title || "Course Final Quiz",
-            total_marks: quizObj.total_marks || data.total_marks || 100,
-            passing_marks: parsed?.passing_marks || quizObj.passing_marks || 60,
-            duration: parsed?.duration || quizObj.duration || 30
-          };
-          setExistingQuiz(foundQuiz);
-          setQuizForm({
-            title: foundQuiz.title,
-            total_marks: foundQuiz.total_marks,
-            passing_marks: foundQuiz.passing_marks,
-            duration: foundQuiz.duration
-          });
-          setQuizIdForQuestion(targetQuizId.toString());
-          setCheckingQuiz(false);
-          return;
+      let res = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?quiz_id=${targetQuizId}`);
+      let data = res.ok ? await res.json() : null;
+      
+      let quizObj = null;
+      if (data) {
+        if (data.title) quizObj = data;
+        else if (data.data && data.data.title) quizObj = data.data;
+        else if (Array.isArray(data.data) && data.data.length > 0 && data.data[0].title) quizObj = data.data[0];
+        else if (data.quiz && data.quiz.title) quizObj = data.quiz;
+      }
+
+      if (!quizObj || !quizObj.title) {
+        res = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?course_id=${courseId}`);
+        data = res.ok ? await res.json() : null;
+        if (data) {
+          if (data.title) quizObj = data;
+          else if (data.data && data.data.title) quizObj = data.data;
+          else if (Array.isArray(data.data) && data.data.length > 0 && data.data[0].title) quizObj = data.data[0];
+          else if (data.quiz && data.quiz.title) quizObj = data.quiz;
         }
       }
 
-      // Try fallback course_id query
-      const resCourse = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?course_id=${courseId}`);
-      if (resCourse.ok) {
-        const data = await resCourse.json();
-        const quizObj = data.title ? data : (data.data || {});
-        if (quizObj && quizObj.title) {
-          const qId = quizObj.id || quizObj.quiz_id || courseId;
-          const parsed = parseQuizResponse(data);
-          const foundQuiz = {
-            id: qId,
-            title: parsed?.title || quizObj.title || "Course Final Quiz",
-            total_marks: quizObj.total_marks || data.total_marks || 100,
-            passing_marks: parsed?.passing_marks || quizObj.passing_marks || 60,
-            duration: parsed?.duration || quizObj.duration || 30
-          };
-          setExistingQuiz(foundQuiz);
-          setQuizForm({
-            title: foundQuiz.title,
-            total_marks: foundQuiz.total_marks,
-            passing_marks: foundQuiz.passing_marks,
-            duration: foundQuiz.duration
-          });
-          setQuizIdForQuestion(qId.toString());
-          localStorage.setItem(`quiz_id_course_${courseId}`, qId.toString());
-          setCheckingQuiz(false);
-          return;
-        }
+      if (quizObj && quizObj.title) {
+        const qId = quizObj.id || quizObj.quiz_id || targetQuizId;
+        const parsed = parseQuizResponse(data);
+        const foundQuiz = {
+          id: qId.toString(),
+          title: parsed?.title || quizObj.title || "Course Final Quiz",
+          total_marks: quizObj.total_marks || data.total_marks || 100,
+          passing_marks: parsed?.passing_marks || quizObj.passing_marks || 60,
+          duration: parsed?.duration || quizObj.duration || 30
+        };
+        setExistingQuiz(foundQuiz);
+        setQuizForm({
+          title: foundQuiz.title,
+          total_marks: foundQuiz.total_marks,
+          passing_marks: foundQuiz.passing_marks,
+          duration: foundQuiz.duration
+        });
+        setQuizIdForQuestion(qId.toString());
+        localStorage.setItem(`quiz_id_course_${courseId}`, qId.toString());
+        setCheckingQuiz(false);
+        return;
       }
     } catch (err) {
       console.error("Failed to check existing quiz:", err);
@@ -392,6 +395,7 @@ const AdminQuizzes = () => {
   };
 
   const [activeAddQuestionQuizId, setActiveAddQuestionQuizId] = useState(null);
+  const [activeEditQuestionId, setActiveEditQuestionId] = useState(null);
   const [modalQuestionForm, setModalQuestionForm] = useState({
     question: '',
     option1: '',
@@ -462,6 +466,7 @@ const AdminQuizzes = () => {
     setIsLoading(true);
     try {
       const adminUserId = localStorage.getItem('adminUserId') || localStorage.getItem('userId') || 2;
+      const isEditing = !!activeEditQuestionId;
       const payload = {
         user_id: parseInt(adminUserId, 10),
         quiz_id: parseInt(activeAddQuestionQuizId, 10),
@@ -473,18 +478,23 @@ const AdminQuizzes = () => {
         correct_answer: modalQuestionForm.correct_answer
       };
 
+      if (isEditing) {
+        payload.question_id = activeEditQuestionId;
+      }
+
+      const method = isEditing ? 'PUT' : 'POST';
       const res = await fetch(`${BASE_URL}/bsgupadmin/create-question/`, {
-        method: 'POST',
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       const data = await res.json();
 
       if (res.ok || data.success) {
-        alert(data.message || data.success || "Question Added Successfully!");
+        alert(data.message || data.success || (isEditing ? "Question Updated Successfully!" : "Question Added Successfully!"));
         
         const newQuestionObj = {
-          id: data.data?.question_id || data.question_id || Date.now().toString(),
+          id: isEditing ? activeEditQuestionId : (data.data?.question_id || data.question_id || Date.now().toString()),
           question: modalQuestionForm.question,
           option1: modalQuestionForm.option1,
           option2: modalQuestionForm.option2,
@@ -495,10 +505,17 @@ const AdminQuizzes = () => {
 
         setAllQuizzes(prev => prev.map(q => {
           if (q.id.toString() === activeAddQuestionQuizId.toString()) {
-            return {
-              ...q,
-              questions: [...(q.questions || []), newQuestionObj]
-            };
+            if (isEditing) {
+               return {
+                 ...q,
+                 questions: q.questions.map(quest => (quest.id || quest.question_id || quest.order)?.toString() === activeEditQuestionId.toString() ? newQuestionObj : quest)
+               };
+            } else {
+               return {
+                 ...q,
+                 questions: [...(q.questions || []), newQuestionObj]
+               };
+            }
           }
           return q;
         }));
@@ -512,12 +529,13 @@ const AdminQuizzes = () => {
           correct_answer: ''
         });
         setActiveAddQuestionQuizId(null);
+        setActiveEditQuestionId(null);
       } else {
-        alert(data.error || "Failed to add question.");
+        alert(data.error || "Failed to save question.");
       }
     } catch (err) {
       console.error(err);
-      alert("Error adding question.");
+      alert("Error saving question.");
     } finally {
       setIsLoading(false);
     }
@@ -840,6 +858,7 @@ const AdminQuizzes = () => {
                         <button
                           onClick={() => {
                             setActiveAddQuestionQuizId(quiz.id);
+                            setActiveEditQuestionId(null);
                             setModalQuestionForm({
                               question: '',
                               option1: '',
@@ -891,15 +910,35 @@ const AdminQuizzes = () => {
                                   <h6 className="font-bold text-slate-800 text-sm sm:text-base leading-snug">
                                     Q{qIdx + 1}: {quest.question}
                                   </h6>
-                                  <button
-                                    onClick={() => handleDeleteQuestion(quiz.id, questionId)}
-                                    className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1.5 rounded-lg transition-colors border border-transparent hover:border-rose-100 flex items-center justify-center shrink-0"
-                                    title="Delete Question"
-                                  >
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                                      <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                                    </svg>
-                                  </button>
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => {
+                                        setActiveAddQuestionQuizId(quiz.id);
+                                        setActiveEditQuestionId(questionId);
+                                        setModalQuestionForm({
+                                          question: quest.question,
+                                          option1: quest.option1,
+                                          option2: quest.option2,
+                                          option3: quest.option3,
+                                          option4: quest.option4,
+                                          correct_answer: quest.correct_answer
+                                        });
+                                      }}
+                                      className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 p-1.5 rounded-lg transition-colors border border-transparent hover:border-blue-100 flex items-center justify-center shrink-0"
+                                      title="Edit Question"
+                                    >
+                                      ✏️
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteQuestion(quiz.id, questionId)}
+                                      className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1.5 rounded-lg transition-colors border border-transparent hover:border-rose-100 flex items-center justify-center shrink-0"
+                                      title="Delete Question"
+                                    >
+                                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                                      </svg>
+                                    </button>
+                                  </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs sm:text-sm">
@@ -945,13 +984,13 @@ const AdminQuizzes = () => {
             {/* Modal Header */}
             <div className="bg-slate-50 border-b border-slate-200 px-6 py-4 flex justify-between items-center">
               <div>
-                <h4 className="text-lg font-bold text-slate-800">Add MCQ Question</h4>
+                <h4 className="text-lg font-bold text-slate-800">{activeEditQuestionId ? 'Edit MCQ Question' : 'Add MCQ Question'}</h4>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Adding to Quiz ID: {activeAddQuestionQuizId} | {allQuizzes.find(q => q.id.toString() === activeAddQuestionQuizId.toString())?.title}
                 </p>
               </div>
               <button
-                onClick={() => setActiveAddQuestionQuizId(null)}
+                onClick={() => { setActiveAddQuestionQuizId(null); setActiveEditQuestionId(null); }}
                 className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-lg transition-colors"
               >
                 ✕
@@ -1038,7 +1077,7 @@ const AdminQuizzes = () => {
               <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
                 <button
                   type="button"
-                  onClick={() => setActiveAddQuestionQuizId(null)}
+                  onClick={() => { setActiveAddQuestionQuizId(null); setActiveEditQuestionId(null); }}
                   className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-5 py-2.5 rounded-xl transition-all text-sm"
                 >
                   Cancel
@@ -1048,7 +1087,7 @@ const AdminQuizzes = () => {
                   disabled={isLoading}
                   className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold px-6 py-2.5 rounded-xl transition-all text-sm shadow-md shadow-emerald-500/10 disabled:opacity-50"
                 >
-                  {isLoading ? 'Saving...' : 'Save Question'}
+                  {isLoading ? 'Saving...' : activeEditQuestionId ? 'Update Question' : 'Save Question'}
                 </button>
               </div>
             </form>

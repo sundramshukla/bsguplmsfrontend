@@ -749,9 +749,9 @@ const StudentEnrolledCourses = () => {
 
         <h2 className="text-3xl font-extrabold text-slate-800 mb-6">{activeCourse.title}</h2>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        <div className="max-w-4xl mx-auto flex flex-col gap-6">
           {/* Sidebar */}
-          <div className="lg:col-span-1 bg-white border border-slate-200 rounded-2xl shadow-sm h-fit overflow-hidden flex flex-col">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
             
             {/* Project / Course Name at the Top */}
             <div className="p-5 border-b border-slate-100 bg-slate-50/50">
@@ -765,7 +765,7 @@ const StudentEnrolledCourses = () => {
             </div>
 
             {/* Lessons Dropdowns List */}
-            <div className="p-3 space-y-2 max-h-[500px] overflow-y-auto">
+            <div className="p-4 space-y-4">
               {activeParts.map((part, index) => {
                 const num = index + 1;
                 const isUnlocked = maxUnlockedPart >= num;
@@ -779,6 +779,11 @@ const StudentEnrolledCourses = () => {
                     <button
                       disabled={!isUnlocked}
                       onClick={() => {
+                        if (!isExpanded) {
+                          setCurrentPart(num);
+                          setActiveSubLessonIndex(-1);
+                          setViewMode('video');
+                        }
                         setExpandedLessons(prev => ({
                           ...prev,
                           [num]: !prev[num]
@@ -810,309 +815,215 @@ const StudentEnrolledCourses = () => {
                       </div>
                     </button>
 
-                    {/* Accordion Content (Links) */}
+                    {/* Accordion Content */}
                     {isExpanded && isUnlocked && (
-                      <div className="bg-white border-t border-slate-50 pl-3 pr-2 py-2 space-y-1 border-l-2 border-slate-100 ml-4 my-1">
-                        
-                        {/* Main Video Link */}
-                        <button
-                          onClick={() => {
-                            setCurrentPart(num);
-                            setActiveSubLessonIndex(-1);
-                            setViewMode('video');
-                          }}
-                          className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
-                            isActiveLesson && activeSubLessonIndex === -1 && viewMode === 'video'
-                              ? 'bg-emerald-500 text-white shadow-sm'
-                              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                          }`}
-                        >
-                          <span className="text-[14px]">🎥</span>
-                          <span className="truncate">Lesson Video</span>
-                        </button>
+                      <div className="bg-slate-50/50 border-t border-slate-100 p-4 md:p-6 space-y-4">
+                        {/* Sub-lessons */}
+                        {subLessonsList.length > 0 && (
+                          <div className="flex gap-2 flex-wrap mb-4 bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
+                            <button 
+                               onClick={() => { setCurrentPart(num); setActiveSubLessonIndex(-1); }}
+                               className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-colors ${activeSubLessonIndex === -1 && currentPart === num ? 'bg-emerald-500 text-white shadow-sm' : 'bg-transparent text-slate-600 hover:bg-slate-100'}`}
+                            >Main Lesson</button>
+                            {subLessonsList.map((sub, sIdx) => (
+                              <button 
+                                 key={sIdx}
+                                 onClick={() => { setCurrentPart(num); setActiveSubLessonIndex(sIdx); }}
+                                 className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-colors ${activeSubLessonIndex === sIdx && currentPart === num ? 'bg-emerald-500 text-white shadow-sm' : 'bg-transparent text-slate-600 hover:bg-slate-100'}`}
+                              >{sub.title || `Part ${sIdx + 1}`}</button>
+                            ))}
+                          </div>
+                        )}
 
-                        {/* Main Notes / Study Material Link */}
-                        <button
-                          onClick={() => {
-                            setCurrentPart(num);
-                            setActiveSubLessonIndex(-1);
-                            setViewMode('notes');
-                          }}
-                          className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
-                            isActiveLesson && activeSubLessonIndex === -1 && viewMode === 'notes'
-                              ? 'bg-emerald-500 text-white shadow-sm'
-                              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                          }`}
-                        >
-                          <span className="text-[14px]">📄</span>
-                          <span className="truncate">Study Material</span>
-                        </button>
-
-                        {/* Sub-lessons (if any exist) */}
-                        {subLessonsList.map((sub, sIdx) => {
-                          const isSubActive = isActiveLesson && activeSubLessonIndex === sIdx;
-                          return (
-                            <div key={sIdx} className="space-y-0.5 pt-1 border-t border-dashed border-slate-100 mt-1">
-                              {/* Sub Video */}
+                        {currentPart === num && (
+                          <div className="space-y-4">
+                            {/* Mode Toggles */}
+                            <div className="flex bg-slate-200/60 p-1 rounded-xl w-fit">
                               <button
-                                onClick={() => {
-                                  setCurrentPart(num);
-                                  setActiveSubLessonIndex(sIdx);
-                                  setViewMode('video');
-                                }}
-                                className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
-                                  isSubActive && viewMode === 'video'
-                                    ? 'bg-emerald-500 text-white shadow-sm'
-                                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 pl-4'
+                                onClick={() => setViewMode('video')}
+                                className={`px-5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+                                  viewMode === 'video'
+                                    ? 'bg-white text-emerald-700 shadow-sm'
+                                    : 'text-slate-600 hover:text-slate-900'
                                 }`}
                               >
-                                <span className="text-[12px]">▶️</span>
-                                <span className="truncate">{sub.title || `Part ${sIdx + 1}`}</span>
+                                <span>🎥</span> Video
                               </button>
-
-                              {/* Sub Notes */}
                               <button
-                                onClick={() => {
-                                  setCurrentPart(num);
-                                  setActiveSubLessonIndex(sIdx);
-                                  setViewMode('notes');
-                                }}
-                                className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
-                                  isSubActive && viewMode === 'notes'
-                                    ? 'bg-emerald-500 text-white shadow-sm'
-                                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 pl-4'
+                                onClick={() => setViewMode('notes')}
+                                className={`px-5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+                                  viewMode === 'notes'
+                                    ? 'bg-white text-emerald-700 shadow-sm'
+                                    : 'text-slate-600 hover:text-slate-900'
                                 }`}
                               >
-                                <span className="text-[12px]">📄</span>
-                                <span className="truncate">Notes: {sub.title || `Part ${sIdx + 1}`}</span>
+                                <span>📄</span> Study Notes
                               </button>
                             </div>
-                          );
-                        })}
+
+                            {/* Content */}
+                            {viewMode === 'video' ? (
+                              <div className="space-y-4 animate-fadeIn">
+                                <YouTubePlayer 
+                                  url={activeVideoUrl} 
+                                  title={activeTitle}
+                                  courseId={activeCourse.id}
+                                  partNum={activePartId}
+                                  onVideoEnd={handleNextPart}
+                                />
+                                <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+                                  <h4 className="text-sm font-bold text-slate-800 mb-2">About this video</h4>
+                                  <p className="text-slate-600 text-sm leading-relaxed">{activeDescription}</p>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm animate-fadeIn">
+                                <h4 className="text-lg font-bold text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-3 mb-4">
+                                  <span>📚</span> Syllabus Material & Reference Notes
+                                </h4>
+                                <p className="text-slate-700 text-sm whitespace-pre-wrap leading-relaxed font-serif">
+                                  {activeDescription}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
                 );
               })}
 
-              {/* Final Quiz Button */}
-              <button
-                disabled={maxUnlockedPart < activeParts.length + 1}
-                onClick={() => setCurrentPart(activeParts.length + 1)}
-                className={`w-full text-left px-4 py-3 rounded-xl font-bold flex items-center justify-between transition-all border ${
-                  currentPart === activeParts.length + 1
-                    ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg border-transparent shadow-emerald-500/20' 
-                    : maxUnlockedPart >= activeParts.length + 1
-                      ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-100'
-                      : 'text-slate-300 cursor-not-allowed bg-slate-50/50 border-slate-200/50'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">🎓</span>
-                  <span className="text-sm">Final Quiz</span>
-                </div>
-                <span>{maxUnlockedPart >= activeParts.length + 1 ? '📝' : '🔒'}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Main Video & Content */}
-          <div className="lg:col-span-3 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm min-h-[500px] flex flex-col justify-between">
-            {lessonsLoading ? (
-              <Loader message="Loading Course Modules..." />
-            ) : currentPart <= activeParts.length ? (
-              <div className="space-y-6 flex-grow">
-                {/* Header Row */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-slate-100 gap-3">
-                  <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
-                      Lesson {currentPart} {activeSubLessonIndex >= 0 ? `• Part ${activeSubLessonIndex + 1}` : ''}
-                    </span>
-                    <h3 className="text-2xl font-black text-slate-800 mt-2 leading-tight">
-                      {activeTitle}
-                    </h3>
+              {/* Final Quiz Section */}
+              <div className="border border-slate-100 rounded-xl overflow-hidden mt-6">
+                <button
+                  disabled={maxUnlockedPart < activeParts.length + 1}
+                  onClick={() => setCurrentPart(activeParts.length + 1)}
+                  className={`w-full text-left px-5 py-4 font-bold flex items-center justify-between transition-all ${
+                    currentPart === activeParts.length + 1
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg' 
+                      : maxUnlockedPart >= activeParts.length + 1
+                        ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
+                        : 'text-slate-300 cursor-not-allowed bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl">🎓</span>
+                    <span className="text-base">Final Quiz</span>
                   </div>
+                  <span>{maxUnlockedPart >= activeParts.length + 1 ? '📝' : '🔒'}</span>
+                </button>
 
-                  {/* Mode Toggles */}
-                  <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
-                    <button
-                      onClick={() => setViewMode('video')}
-                      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                        viewMode === 'video'
-                          ? 'bg-white text-emerald-700 shadow-sm'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      <span>🎥</span> Video
-                    </button>
-                    <button
-                      onClick={() => setViewMode('notes')}
-                      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                        viewMode === 'notes'
-                          ? 'bg-white text-emerald-700 shadow-sm'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      <span>📄</span> Study Notes
-                    </button>
-                  </div>
-                </div>
-
-                {viewMode === 'video' ? (
-                  <div className="space-y-6 animate-fadeIn">
-                    {/* Dynamic Tracking Video Player */}
-                    <YouTubePlayer 
-                      url={activeVideoUrl} 
-                      title={activeTitle}
-                      courseId={activeCourse.id}
-                      partNum={activePartId}
-                      onVideoEnd={handleNextPart}
-                    />
-
-                    <div className="bg-slate-50 border border-slate-150 rounded-xl p-5">
-                      <h4 className="text-sm font-bold text-slate-700 mb-2">About this video</h4>
-                      <p className="text-slate-600 leading-relaxed text-sm">{activeDescription}</p>
-                    </div>
-
-                    <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                      <div className="flex items-center gap-2.5 text-emerald-800 font-semibold text-sm">
-                        <span className="text-lg">📺</span>
-                        <span>Complete this module to auto-unlock the next learning objective.</span>
-                      </div>
-                      <span className="text-xs font-bold text-emerald-600 bg-emerald-100 px-3 py-1 rounded-full shrink-0">
-                        Auto-Advance Active
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-6 animate-fadeIn">
-                    {/* Beautiful Study Article Layout */}
-                    <div className="bg-gradient-to-br from-emerald-50/40 to-slate-50 border border-slate-150 rounded-2xl p-6 md:p-8 relative overflow-hidden shadow-inner">
-                      <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none select-none text-9xl">📖</div>
+                {currentPart === activeParts.length + 1 && (
+                  <div className="p-6 bg-white border-t border-slate-100">
+                    <div className="space-y-6">
+                      <h3 className="text-2xl font-bold text-slate-800">Final Course Examination</h3>
+                      <p className="text-slate-500">You must pass this quiz to graduate from the course and obtain your official Scout and Guide certificate.</p>
                       
-                      <div className="prose max-w-none text-slate-700 leading-relaxed space-y-4">
-                        <h4 className="text-lg font-bold text-slate-800 flex items-center gap-2 border-b border-slate-200 pb-2">
-                          <span>📚</span> Syllabus Material & Reference Notes
-                        </h4>
-                        <p className="text-base text-slate-700 whitespace-pre-wrap leading-relaxed font-serif">
-                          {activeDescription}
-                        </p>
-                      </div>
-
-                      <div className="mt-8 pt-6 border-t border-slate-200/60 flex flex-wrap justify-between items-center gap-3">
-                        <span className="text-xs text-slate-400 font-medium">Read and master these concepts before taking the Final Examination.</span>
-                        <button
-                          onClick={() => window.print()}
-                          className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 font-bold px-4 py-2 rounded-xl text-xs transition-all shadow-sm flex items-center gap-1.5"
-                        >
-                          <span>🖨️</span> Print Notes
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              // Quiz Block
-              <div className="space-y-6">
-                <h3 className="text-2xl font-bold text-slate-800">Final Course Examination</h3>
-                <p className="text-slate-500">You must pass this quiz to graduate from the course and obtain your official Scout and Guide certificate.</p>
-                
-                {!quizStarted ? (
-                  <div className="py-8 text-center space-y-4">
-                    <div className="text-6xl">📝</div>
-                    <h4 className="text-xl font-bold text-slate-800">Are you ready to start the quiz?</h4>
-                    <p className="text-slate-500 max-w-md mx-auto">This examination evaluates your knowledge of Knots, First Aid, and Scout Values. Pass mark is 60%.</p>
-                    <button 
-                      onClick={loadQuiz}
-                      disabled={quizLoading}
-                      className="bg-emerald-500 text-white font-bold px-10 py-3.5 rounded-xl hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/20 disabled:opacity-50"
-                    >
-                      {quizLoading ? 'Initializing Quiz...' : 'Start Quiz Now'}
-                    </button>
-                  </div>
-                ) : quizResult ? (
-                  // Quiz Results Page
-                  <div className="py-8 text-center space-y-6">
-                    <div className="text-7xl">{quizResult.passed ? '🎉' : '❌'}</div>
-                    <h4 className="text-2xl font-extrabold text-slate-800">
-                      {quizResult.passed ? 'Quiz Completed Successfully' : 'Quiz Failed'}
-                    </h4>
-                    
-                    <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 max-w-lg mx-auto space-y-4 text-left">
-                      <div>
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Exam Performance</span>
-                        <p className="text-2xl font-black text-slate-800 mt-1">
-                          Score Secured: <span className="text-emerald-500">{quizResult.score}%</span>
-                        </p>
-                        <p className="text-xs font-bold text-slate-500 mt-1">Passing requirement is {quizData.passing_marks || 60}%</p>
-                      </div>
-                      
-                      {quizResult.message && (
-                        <div className="border-t border-slate-200 pt-4">
-                          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Status Response</span>
-                          <p className="text-sm font-semibold text-slate-700 mt-1">
-                            {quizResult.message}
-                          </p>
+                      {!quizStarted ? (
+                        <div className="py-8 text-center space-y-4">
+                          <div className="text-6xl">📝</div>
+                          <h4 className="text-xl font-bold text-slate-800">Are you ready to start the quiz?</h4>
+                          <p className="text-slate-500 max-w-md mx-auto">This examination evaluates your knowledge. Pass mark is 60%.</p>
+                          <button 
+                            onClick={loadQuiz}
+                            disabled={quizLoading}
+                            className="bg-emerald-500 text-white font-bold px-10 py-3.5 rounded-xl hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+                          >
+                            {quizLoading ? 'Initializing Quiz...' : 'Start Quiz Now'}
+                          </button>
                         </div>
-                      )}
-                    </div>
+                      ) : quizResult ? (
+                        <div className="py-8 text-center space-y-6">
+                          <div className="text-7xl">{quizResult.passed ? '🎉' : '❌'}</div>
+                          <h4 className="text-2xl font-extrabold text-slate-800">
+                            {quizResult.passed ? 'Quiz Completed Successfully' : 'Quiz Failed'}
+                          </h4>
+                          
+                          <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 max-w-lg mx-auto space-y-4 text-left">
+                            <div>
+                              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Exam Performance</span>
+                              <p className="text-2xl font-black text-slate-800 mt-1">
+                                Score Secured: <span className="text-emerald-500">{quizResult.score}%</span>
+                              </p>
+                              <p className="text-xs font-bold text-slate-500 mt-1">Passing requirement is {quizData.passing_marks || 60}%</p>
+                            </div>
+                            
+                            {quizResult.message && (
+                              <div className="border-t border-slate-200 pt-4">
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Status Response</span>
+                                <p className="text-sm font-semibold text-slate-700 mt-1">
+                                  {quizResult.message}
+                                </p>
+                              </div>
+                            )}
+                          </div>
 
-                    <div className="pt-4 flex justify-center gap-3">
-                      {!quizResult.passed && (
-                        <button 
-                          onClick={() => { setQuizResult(null); setSelectedAnswers({}); }}
-                          className="bg-emerald-500 text-white font-extrabold px-8 py-3 rounded-xl hover:bg-emerald-600 transition-colors text-sm shadow-md shadow-emerald-500/10"
-                        >
-                          Try Again
-                        </button>
-                      )}
-                      <button 
-                        onClick={resetStudyPanel}
-                        className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-8 py-3 rounded-xl transition-all text-sm"
-                      >
-                        Back to Courses
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  // Active Questions List
-                  <div className="space-y-8 pt-4">
-                    {(quizData.questions || []).map((q, idx) => (
-                      <div key={q.id || idx} className="border border-slate-200 rounded-xl p-5 bg-slate-50/50">
-                        <h4 className="font-bold text-slate-800 mb-4 text-lg">Question {idx + 1}: {q.question}</h4>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {[q.option1, q.option2, q.option3, q.option4].map((opt, oIdx) => (
-                            <button
-                              key={oIdx}
-                              onClick={() => handleOptionSelect(idx, opt)}
-                              className={`w-full text-left p-3 rounded-xl border font-semibold transition-all ${
-                                selectedAnswers[idx] === opt 
-                                  ? 'bg-emerald-50 border-emerald-500 text-emerald-700 ring-2 ring-emerald-500/20' 
-                                  : 'bg-white border-slate-200 hover:border-slate-300 text-slate-600'
-                              }`}
+                          <div className="pt-4 flex justify-center gap-3">
+                            {!quizResult.passed && (
+                              <button 
+                                onClick={() => { setQuizResult(null); setSelectedAnswers({}); }}
+                                className="bg-emerald-500 text-white font-extrabold px-8 py-3 rounded-xl hover:bg-emerald-600 transition-colors text-sm shadow-md shadow-emerald-500/10"
+                              >
+                                Try Again
+                              </button>
+                            )}
+                            {quizResult.passed && (
+                              <button 
+                                onClick={() => setShowCertificate(true)}
+                                className="bg-[#10b981] hover:bg-[#059669] text-white font-extrabold px-8 py-3 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 text-sm"
+                              >
+                                <span>🏆</span> View Certificate
+                              </button>
+                            )}
+                            <button 
+                              onClick={resetStudyPanel}
+                              className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-8 py-3 rounded-xl transition-all text-sm"
                             >
-                              {opt}
+                              Back to Courses
                             </button>
-                          ))}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ) : (
+                        <div className="space-y-8 pt-4">
+                          {(quizData.questions || []).map((q, idx) => (
+                            <div key={q.id || idx} className="border border-slate-200 rounded-xl p-5 bg-slate-50/50">
+                              <h4 className="font-bold text-slate-800 mb-4 text-lg">Question {idx + 1}: {q.question}</h4>
+                              
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {[q.option1, q.option2, q.option3, q.option4].map((opt, oIdx) => (
+                                  <button
+                                    key={oIdx}
+                                    onClick={() => handleOptionSelect(idx, opt)}
+                                    className={`w-full text-left p-3 rounded-xl border font-semibold transition-all ${
+                                      selectedAnswers[idx] === opt 
+                                        ? 'bg-emerald-50 border-emerald-500 text-emerald-700 ring-2 ring-emerald-500/20' 
+                                        : 'bg-white border-slate-200 hover:border-slate-300 text-slate-600'
+                                    }`}
+                                  >
+                                    {opt}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
 
-                    <div className="flex justify-end pt-4 border-t border-slate-100">
-                      <button 
-                        onClick={submitQuiz}
-                        disabled={quizLoading}
-                        className="bg-emerald-500 text-white font-extrabold px-10 py-3.5 rounded-xl hover:bg-emerald-600 transition-all shadow-md shadow-emerald-500/10 disabled:opacity-50"
-                      >
-                        {quizLoading ? 'Evaluating...' : 'Submit Answers'}
-                      </button>
+                          <div className="flex justify-end pt-4 border-t border-slate-100">
+                            <button 
+                              onClick={submitQuiz}
+                              disabled={quizLoading}
+                              className="bg-emerald-500 text-white font-extrabold px-10 py-3.5 rounded-xl hover:bg-emerald-600 transition-all shadow-md shadow-emerald-500/10 disabled:opacity-50"
+                            >
+                              {quizLoading ? 'Evaluating...' : 'Submit Answers'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
               </div>
-            )}
+            </div>
           </div>
         </div>
 
