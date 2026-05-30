@@ -739,7 +739,7 @@ const StudentEnrolledCourses = () => {
     }
 
     return (
-      <div className="p-6 max-w-6xl mx-auto text-left relative">
+      <div className="p-2 sm:p-6 max-w-6xl mx-auto text-left relative">
         <button 
           onClick={resetStudyPanel} 
           className="mb-6 flex items-center gap-2 text-slate-600 hover:text-slate-900 font-bold transition-colors"
@@ -752,20 +752,9 @@ const StudentEnrolledCourses = () => {
         <div className="max-w-4xl mx-auto flex flex-col gap-6">
           {/* Sidebar */}
           <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
-            
-            {/* Project / Course Name at the Top */}
-            <div className="p-5 border-b border-slate-100 bg-slate-50/50">
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-lg">⚜️</span>
-                <span className="text-[10px] font-bold text-emerald-600 tracking-wider uppercase">Enrolled Course</span>
-              </div>
-              <h3 className="text-base font-extrabold text-slate-800 leading-snug break-words">
-                {activeCourse.title}
-              </h3>
-            </div>
 
             {/* Lessons Dropdowns List */}
-            <div className="p-4 space-y-4">
+            <div className="p-2 sm:p-4 space-y-3 sm:space-y-4">
               {activeParts.map((part, index) => {
                 const num = index + 1;
                 const isUnlocked = maxUnlockedPart >= num;
@@ -817,7 +806,7 @@ const StudentEnrolledCourses = () => {
 
                     {/* Accordion Content */}
                     {isExpanded && isUnlocked && (
-                      <div className="bg-slate-50/50 border-t border-slate-100 p-4 md:p-6 space-y-4">
+                      <div className="bg-slate-50/50 border-t border-slate-100 p-2 sm:p-4 md:p-6 space-y-4">
                         {/* Sub-lessons */}
                         {subLessonsList.length > 0 && (
                           <div className="flex gap-2 flex-wrap mb-4 bg-white p-2 rounded-xl border border-slate-200 shadow-sm">

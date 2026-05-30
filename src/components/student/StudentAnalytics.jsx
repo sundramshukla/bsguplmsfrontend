@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BASE_URL } from '../../config';
 
 const StudentAnalytics = ({ onNavigate }) => {
   const [stats, setStats] = useState({
@@ -8,25 +9,55 @@ const StudentAnalytics = ({ onNavigate }) => {
   });
 
   useEffect(() => {
-    const userId = localStorage.getItem('userId') || 'guest';
-    
-    // 1. Get enrolled count
-    const enrolledKey = `enrolledCourses_${userId}`;
-    const enrolledList = JSON.parse(localStorage.getItem(enrolledKey) || '[]');
-    
-    // 2. Get completed count
-    const completedKey = `completedCourses_${userId}`;
-    const completedList = JSON.parse(localStorage.getItem(completedKey) || '[]');
-    
-    // 3. Get certificates count
-    const certKey = `earnedCertificates_${userId}`;
-    const certList = JSON.parse(localStorage.getItem(certKey) || '[]');
+    const fetchStats = async () => {
+      const userId = localStorage.getItem('userId') || 'guest';
+      
+      // 1. Get lists from local storage
+      const enrolledKey = `enrolledCourses_${userId}`;
+      const enrolledList = JSON.parse(localStorage.getItem(enrolledKey) || '[]');
+      
+      const completedKey = `completedCourses_${userId}`;
+      const completedList = JSON.parse(localStorage.getItem(completedKey) || '[]');
+      
+      const certKey = `earnedCertificates_${userId}`;
+      const certList = JSON.parse(localStorage.getItem(certKey) || '[]');
 
-    setStats({
-      coursesEnrolled: enrolledList.length,
-      coursesCompleted: completedList.length,
-      certificatesEarned: certList.length
-    });
+      try {
+        const res = await fetch(`${BASE_URL}/bsgupadmin/createcourse/`);
+        const data = await res.json();
+        
+        if (data.success && data.data) {
+          const activeCourseIds = data.data.map(c => c.id.toString());
+          
+          const validEnrolled = enrolledList.filter(id => activeCourseIds.includes(id.toString()));
+          const validCompleted = completedList.filter(id => activeCourseIds.includes(id.toString()));
+          const validCerts = certList.filter(id => activeCourseIds.includes(id.toString()));
+          
+          // Cleanup deleted courses from local storage
+          localStorage.setItem(enrolledKey, JSON.stringify(validEnrolled));
+          localStorage.setItem(completedKey, JSON.stringify(validCompleted));
+          localStorage.setItem(certKey, JSON.stringify(validCerts));
+
+          setStats({
+            coursesEnrolled: validEnrolled.length,
+            coursesCompleted: validCompleted.length,
+            certificatesEarned: validCerts.length
+          });
+          return;
+        }
+      } catch (err) {
+        console.error("Failed to fetch courses for analytics:", err);
+      }
+
+      // Fallback
+      setStats({
+        coursesEnrolled: enrolledList.length,
+        coursesCompleted: completedList.length,
+        certificatesEarned: certList.length
+      });
+    };
+
+    fetchStats();
   }, []);
 
   return (

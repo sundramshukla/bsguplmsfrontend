@@ -110,7 +110,7 @@ const AdminDashboard = ({ onLogout }) => {
 
       {/* Main Content */}
       <div className="flex-grow overflow-y-auto relative w-full h-full">
-        <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto py-4 sm:py-8 px-0 sm:px-6 lg:px-8">
             {activeTab === 'analytics' && <AdminAnalytics />}
             {activeTab === 'courses' && <AdminCourses />}
             {activeTab === 'lessons' && <AdminLessons />}

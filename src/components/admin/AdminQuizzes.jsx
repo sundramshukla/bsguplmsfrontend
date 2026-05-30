@@ -66,6 +66,11 @@ const AdminQuizzes = () => {
   const [allQuizzes, setAllQuizzes] = useState([]);
   const [quizzesLoading, setQuizzesLoading] = useState(false);
   const [filterCourseId, setFilterCourseId] = useState('all');
+  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+
+  const [isStep1Open, setIsStep1Open] = useState(true);
+  const [isStep2Open, setIsStep2Open] = useState(false);
+  const [isAllQuizzesOpen, setIsAllQuizzesOpen] = useState(true);
 
   const fetchAllExistingQuizzes = async (coursesList) => {
     setQuizzesLoading(true);
@@ -542,25 +547,33 @@ const AdminQuizzes = () => {
   };
 
   return (
-    <div className="p-4 sm:p-6 text-left space-y-8">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-800">Manage Quizzes & Questions</h2>
+    <div className="p-2 sm:p-6 text-left space-y-4 sm:space-y-8">
+      <div className="flex justify-between items-center mb-4 sm:mb-6 px-2 sm:px-0">
+        <h2 className="text-xl sm:text-3xl font-extrabold text-slate-800">Manage Quizzes & Questions</h2>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8">
         {/* Step 1: Create Quiz */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-          <div>
-            <h3 className="text-xl font-bold text-slate-800 mb-1">Step 1: Create Course Quiz</h3>
-            <p className="text-xs text-slate-500">Configure the duration and parameters for the final exam.</p>
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div 
+            className="p-3 sm:p-6 flex justify-between items-center cursor-pointer bg-slate-50/50 hover:bg-slate-50 transition-colors border-b border-slate-100"
+            onClick={() => setIsStep1Open(!isStep1Open)}
+          >
+            <div>
+              <h3 className="text-lg sm:text-xl font-bold text-slate-800 mb-0.5">Step 1: Create Course Quiz</h3>
+              <p className="text-[10px] sm:text-xs text-slate-500">Configure the duration and parameters for the final exam.</p>
+            </div>
+            <div className="text-slate-400 p-2">{isStep1Open ? '▲' : '▼'}</div>
           </div>
 
+          {isStep1Open && (
+            <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1">Target Course</label>
             <select 
               value={selectedCourseId} 
               onChange={(e) => setSelectedCourseId(e.target.value)}
-              className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-[#7c3aed] focus:outline-none"
+              className="w-full max-w-full truncate border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-[#7c3aed] focus:outline-none"
             >
               {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
             </select>
@@ -672,16 +685,26 @@ const AdminQuizzes = () => {
               )}
             </div>
           </form>
+            </div>
+          )}
         </div>
 
         {/* Step 2: Add Questions */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-          <div>
-            <h3 className="text-xl font-bold text-slate-800 mb-1">Step 2: Add Questions to Quiz</h3>
-            <p className="text-xs text-slate-500">Insert Multiple Choice Questions (MCQs) into the specific Quiz ID.</p>
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div 
+            className="p-3 sm:p-6 flex justify-between items-center cursor-pointer bg-slate-50/50 hover:bg-slate-50 transition-colors border-b border-slate-100"
+            onClick={() => setIsStep2Open(!isStep2Open)}
+          >
+            <div>
+              <h3 className="text-lg sm:text-xl font-bold text-slate-800 mb-0.5">Step 2: Add Questions to Quiz</h3>
+              <p className="text-[10px] sm:text-xs text-slate-500">Insert Multiple Choice Questions (MCQs) into the specific Quiz ID.</p>
+            </div>
+            <div className="text-slate-400 p-2">{isStep2Open ? '▲' : '▼'}</div>
           </div>
 
-          <form onSubmit={handleCreateQuestion} className="space-y-4">
+          {isStep2Open && (
+            <div className="p-3 sm:p-6">
+          <form onSubmit={handleCreateQuestion} className="space-y-4 sm:space-y-6">
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1">Target Quiz (ID & Title)</label>
               {quizzesLoading ? (
@@ -693,7 +716,7 @@ const AdminQuizzes = () => {
                   value={quizIdForQuestion} 
                   onChange={(e) => setQuizIdForQuestion(e.target.value)}
                   required 
-                  className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-[#7c3aed] focus:outline-none"
+                  className="w-full max-w-full truncate border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-[#7c3aed] focus:outline-none"
                 >
                   <option value="">-- Select a Quiz --</option>
                   {allQuizzes.map(q => (
@@ -788,33 +811,72 @@ const AdminQuizzes = () => {
               {isLoading ? 'Adding...' : 'Add Question API'}
             </button>
           </form>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Premium Dashboard section: All Quizzes & Questions */}
-      <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-4">
-          <div>
-            <h3 className="text-xl sm:text-2xl font-bold text-slate-800">All Quizzes & Created Questions</h3>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1">View and manage all course quizzes and their respective MCQ questions.</p>
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-4 sm:mb-0">
+        <div 
+          className="p-3 sm:p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 cursor-pointer bg-slate-50/50 hover:bg-slate-50 transition-colors border-b border-slate-100"
+          onClick={(e) => {
+            if (e.target.tagName.toLowerCase() !== 'select' && e.target.tagName.toLowerCase() !== 'option') {
+              setIsAllQuizzesOpen(!isAllQuizzesOpen);
+            }
+          }}
+        >
+          <div className="flex-1 w-full flex justify-between items-center">
+            <div>
+              <h3 className="text-lg sm:text-2xl font-bold text-slate-800 mb-0.5">All Quizzes & Created Questions</h3>
+              <p className="text-[10px] sm:text-sm text-slate-500">View and manage all course quizzes and their respective MCQ questions.</p>
+            </div>
+            <div className="text-slate-400 p-2 md:hidden">{isAllQuizzesOpen ? '▲' : '▼'}</div>
           </div>
           
-          {/* Dropdown to Filter by Course/Project */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full md:w-auto shrink-0">
-            <span className="text-sm font-semibold text-slate-600 whitespace-nowrap">🔍 Filter by Course:</span>
-            <select
-              value={filterCourseId}
-              onChange={(e) => setFilterCourseId(e.target.value)}
-              className="border-2 border-slate-200 rounded-xl p-2.5 font-medium text-sm text-slate-700 focus:border-[#7c3aed] focus:outline-none w-full sm:min-w-[200px] sm:max-w-xs bg-white cursor-pointer"
-            >
-              <option value="all">✨ Show All Courses</option>
-              {courses.map(c => (
-                <option key={c.id} value={c.id.toString()}>{c.title}</option>
-              ))}
-            </select>
+          {/* Custom Dropdown to Filter by Course/Project */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full md:w-auto shrink-0 relative" onClick={e => e.stopPropagation()}>
+            <span className="text-xs sm:text-sm font-semibold text-slate-600 whitespace-nowrap">🔍 Filter by Course:</span>
+            
+            <div className="relative w-full sm:w-auto">
+              <div 
+                onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
+                className="border-2 border-slate-200 rounded-xl p-2 font-medium text-sm text-slate-700 focus:border-[#7c3aed] focus:outline-none w-full sm:min-w-[200px] sm:max-w-xs bg-white cursor-pointer flex justify-between items-center gap-2"
+              >
+                <span className="truncate">
+                  {filterCourseId === 'all' 
+                    ? '✨ Show All Courses' 
+                    : courses.find(c => c.id.toString() === filterCourseId)?.title || '✨ Show All Courses'}
+                </span>
+                <span className="text-[10px] text-slate-400 shrink-0">{isFilterDropdownOpen ? '▲' : '▼'}</span>
+              </div>
+
+              {isFilterDropdownOpen && (
+                <div className="absolute top-full left-0 sm:left-auto sm:right-0 w-full sm:w-max sm:min-w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto">
+                  <div 
+                    className={`p-3 text-sm font-medium cursor-pointer transition-colors border-b border-slate-100 ${filterCourseId === 'all' ? 'bg-[#7c3aed]/10 text-[#7c3aed]' : 'hover:bg-slate-50 text-slate-700'}`}
+                    onClick={() => { setFilterCourseId('all'); setIsFilterDropdownOpen(false); }}
+                  >
+                    ✨ Show All Courses
+                  </div>
+                  {courses.map(c => (
+                    <div 
+                      key={c.id} 
+                      className={`p-3 text-sm font-medium cursor-pointer transition-colors ${filterCourseId === c.id.toString() ? 'bg-[#7c3aed]/10 text-[#7c3aed]' : 'hover:bg-slate-50 text-slate-700'}`}
+                      onClick={() => { setFilterCourseId(c.id.toString()); setIsFilterDropdownOpen(false); }}
+                    >
+                      {c.title}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
+          <div className="text-slate-400 p-2 hidden md:block">{isAllQuizzesOpen ? '▲' : '▼'}</div>
         </div>
 
+        {isAllQuizzesOpen && (
+          <div className="p-3 sm:p-6 pt-4 space-y-4 sm:space-y-6">
         {quizzesLoading ? (
           <div className="flex justify-center items-center py-12">
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#7c3aed]"></div>
@@ -973,6 +1035,8 @@ const AdminQuizzes = () => {
         })() : (
           <div className="bg-slate-50 border border-slate-200 text-slate-500 rounded-xl p-12 text-center font-semibold text-lg">
             No quizzes created in the system yet.
+          </div>
+        )}
           </div>
         )}
       </div>

@@ -9,8 +9,9 @@ const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // User Data
-  const [formData, setFormData] = useState({ name: '', email: '', mobile_number: '' });
-  const [loginMobile, setLoginMobile] = useState('');
+  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
   
   // OTP flow states
   const [otpMode, setOtpMode] = useState(false);
@@ -18,6 +19,12 @@ const Navbar = () => {
   const [otp, setOtp] = useState('');
   const [authType, setAuthType] = useState(''); // 'register' or 'login'
   const [isLoading, setIsLoading] = useState(false);
+
+  // Forgot password flow states
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotOtpMode, setForgotOtpMode] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
 
   const [profileData, setProfileData] = useState({
     full_name: '',
@@ -36,8 +43,10 @@ const Navbar = () => {
       setIsLoginOpen(false);
       setOtpMode(false);
       setProfileMode(false);
+      setForgotOtpMode(false);
+      setIsForgotPasswordOpen(false);
       setOtp('');
-      setFormData({ name: '', email: '', mobile_number: '' });
+      setFormData({ name: '', email: '', password: '' });
     };
     window.addEventListener('openRegisterModal', handleEvent);
     return () => window.removeEventListener('openRegisterModal', handleEvent);
@@ -48,7 +57,7 @@ const Navbar = () => {
       const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
       setIsLoggedIn(loggedIn);
       if (!loggedIn) {
-        setFormData({ name: '', email: '', mobile_number: '' });
+        setFormData({ name: '', email: '', password: '' });
       } else {
         const fetchProfileName = async () => {
           try {
@@ -94,8 +103,10 @@ const Navbar = () => {
     setIsLoginOpen(false);
     setOtpMode(false);
     setProfileMode(false);
+    setForgotOtpMode(false);
+    setIsForgotPasswordOpen(false);
     setOtp('');
-    setFormData({ name: '', email: '', mobile_number: '' });
+    setFormData({ name: '', email: '', password: '' });
   };
 
   const openLogin = () => {
@@ -103,111 +114,14 @@ const Navbar = () => {
     setIsRegisterOpen(false);
     setOtpMode(false);
     setProfileMode(false);
+    setForgotOtpMode(false);
+    setIsForgotPasswordOpen(false);
     setOtp('');
-    setLoginMobile('');
+    setLoginEmail('');
+    setLoginPassword('');
   };
 
-  const handleRegisterSubmit = async (e) => {
-    e.preventDefault();
-    if (!formData.mobile_number) {
-      alert('Please provide mobile number.');
-      return;
-    }
-    
-    try {
-      setIsLoading(true);
-      const res = await fetch(`${BASE_URL}/bsgupadmin/register/?mobile_number=${formData.mobile_number}&role=student`, {
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        console.log("Register response:", data);
-        alert(`Development Info: The OTP is ${data.otp}`);
-        setAuthType('register');
-        setOtpMode(true);
-      } else {
-        alert("Failed to send OTP for registration.");
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Error sending OTP");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleLoginSubmit = async (e) => {
-    e.preventDefault();
-    if (!loginMobile) {
-      alert('Please provide mobile number.');
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      const res = await fetch(`${BASE_URL}/bsgupadmin/login/?mobile_number=${loginMobile}`, {
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        console.log("Login response:", data);
-        alert(`Development Info: The OTP is ${data.otp}`);
-        setAuthType('login');
-        setOtpMode(true);
-      } else {
-        alert("Failed to send OTP for login.");
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Error sending OTP");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleOtpSubmit = async (e) => {
-    e.preventDefault();
-    if (!otp) {
-      alert("Please enter OTP");
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      let url = "";
-      let payload = {};
-
-      if (authType === 'register') {
-        url = `${BASE_URL}/bsgupadmin/register/?mobile_number=${formData.mobile_number}&role=student`;
-        payload = {
-            mobile_number: parseInt(formData.mobile_number, 10),
-            otp: parseInt(otp, 10),
-            role: "student"
-        };
-      } else if (authType === 'login') {
-        url = `${BASE_URL}/bsgupadmin/login/?mobile_number=${loginMobile}`;
-        payload = {
-            mobile_number: parseInt(loginMobile, 10),
-            otp: parseInt(otp, 10)
-        };
-      }
-
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (res.ok) {
-        // success
-        const data = await res.json().catch(() => ({}));
-        
+  const processAuthSuccess = async (data, authType, emailStr) => {
         // Helper to extract JWT token deeply from response
         const extractToken = (obj) => {
            if (typeof obj === 'string' && obj.startsWith('eyJ')) return obj;
@@ -232,10 +146,6 @@ const Navbar = () => {
         const token = extractToken(data);
         let returnedUserId = null;
         let isAdmin = false;
-
-        if (loginMobile === '9935266755') {
-           isAdmin = true;
-        }
 
         if (token) {
            localStorage.setItem('token', token);
@@ -334,7 +244,7 @@ const Navbar = () => {
            setIsRegisterOpen(false);
            setOtpMode(false);
            setIsLoginOpen(true);
-           alert("Registration successful! Please login with your mobile number to continue.");
+           alert("Registration successful! Please login with your email and password to continue.");
         } else {
            // Fallback if authType is somehow missing
            setIsLoggedIn(true);
@@ -349,6 +259,104 @@ const Navbar = () => {
            setOtpMode(false);
            window.location.hash = '#student';
         }
+  };
+
+  const handleRegisterSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.email || !formData.password) {
+      alert('Please provide email and password.');
+      return;
+    }
+    
+    try {
+      setIsLoading(true);
+      const url = `${BASE_URL}/bsgupadmin/registerthroughemail/?email=${encodeURIComponent(formData.email)}&password=${encodeURIComponent(formData.password)}&role=student`;
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        console.log("Register response:", data);
+        alert(`Development Info: The OTP is ${data.otp || 'sent'}`);
+        setAuthType('register');
+        setOtpMode(true);
+      } else {
+        alert("Failed to send OTP for registration. Check email/password.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error sending OTP");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLoginSubmit = async (e) => {
+    e.preventDefault();
+    if (!loginEmail || !loginPassword) {
+      alert('Please provide email and password.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const res = await fetch(`${BASE_URL}/bsgupadmin/loginthroughemail/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email: loginEmail, password: loginPassword })
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        console.log("Login response:", data);
+        setAuthType('login');
+        await processAuthSuccess(data, 'login', loginEmail);
+      } else {
+        alert("Invalid credentials or login failed.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error during login");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleOtpSubmit = async (e) => {
+    e.preventDefault();
+    if (!otp) {
+      alert("Please enter OTP");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      if (authType !== 'register') {
+        return;
+      }
+      
+      const url = `${BASE_URL}/bsgupadmin/registerthroughemail/?email=${encodeURIComponent(formData.email)}&password=${encodeURIComponent(formData.password)}&role=student`;
+      const payload = {
+          email: formData.email,
+          otp: otp
+      };
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        await processAuthSuccess(data, 'register', formData.email);
       } else {
         alert("Invalid OTP or error occurred.");
       }
@@ -401,6 +409,73 @@ const Navbar = () => {
     }
   };
 
+  const openForgotPassword = () => {
+    setIsLoginOpen(false);
+    setIsRegisterOpen(false);
+    setIsForgotPasswordOpen(true);
+    setForgotOtpMode(false);
+    setForgotEmail('');
+    setOtp('');
+    setNewPassword('');
+  };
+
+  const handleForgotPasswordSubmit = async (e) => {
+    e.preventDefault();
+    if (!forgotEmail) {
+      alert('Please provide email.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const url = `${BASE_URL}/bsgupadmin/forgetpassword/?email=${encodeURIComponent(forgotEmail)}`;
+      const res = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
+      if (res.ok) {
+        const data = await res.json();
+        alert(`Development Info: The OTP is ${data.otp || 'sent'}`);
+        setForgotOtpMode(true);
+      } else {
+        alert("Failed to send OTP for reset password. Check your email.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error sending OTP");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPasswordSubmit = async (e) => {
+    e.preventDefault();
+    if (!otp || !newPassword) {
+      alert('Please provide OTP and new password.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const url = `${BASE_URL}/bsgupadmin/forgetpassword/?email=${encodeURIComponent(forgotEmail)}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail, otp: otp, new_password: newPassword })
+      });
+      if (res.ok) {
+        alert("Password reset successfully! Please login with your new password.");
+        setIsForgotPasswordOpen(false);
+        setForgotOtpMode(false);
+        openLogin();
+      } else {
+        alert("Invalid OTP or error occurred.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error verifying OTP");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleLogout = () => {
     setIsLoggedIn(false);
     localStorage.removeItem('isLoggedIn');
@@ -411,8 +486,9 @@ const Navbar = () => {
     localStorage.removeItem('userId');
     localStorage.removeItem('adminUserId');
     window.dispatchEvent(new Event('authChange'));
-    setFormData({ name: '', email: '', mobile_number: '' });
-    setLoginMobile('');
+    setFormData({ name: '', email: '', password: '' });
+    setLoginEmail('');
+    setLoginPassword('');
     window.location.hash = '#';
   };
 
@@ -570,16 +646,29 @@ const Navbar = () => {
             <h3 className="text-2xl font-bold text-slate-900 mb-4">{profileMode ? 'Complete Your Profile' : 'Register for Beginner Course'}</h3>
             {!otpMode && !profileMode && (
               <form onSubmit={handleRegisterSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Mobile Number</label>
-                  <input
-                    type="tel"
-                    name="mobile_number"
-                    value={formData.mobile_number}
-                    onChange={handleFormChange}
-                    className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/50 focus:border-[#7c3aed]"
-                    required
-                  />
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleFormChange}
+                      className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/50 focus:border-[#7c3aed]"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+                    <input
+                      type="password"
+                      name="password"
+                      value={formData.password}
+                      onChange={handleFormChange}
+                      className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/50 focus:border-[#7c3aed]"
+                      required
+                    />
+                  </div>
                 </div>
                 <button
                   type="submit"
@@ -594,7 +683,7 @@ const Navbar = () => {
             {otpMode && !profileMode && (
               <form onSubmit={handleOtpSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Enter OTP sent to {formData.mobile_number}</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Enter OTP sent to {formData.email}</label>
                   <input
                     type="number"
                     value={otp}
@@ -682,14 +771,64 @@ const Navbar = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setIsLoginOpen(false)}>
           <div className="bg-white p-8 rounded-xl max-w-md w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-2xl font-bold text-slate-900 mb-4">Login to your account</h3>
-            {!otpMode ? (
               <form onSubmit={handleLoginSubmit} className="space-y-4">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                    <input
+                      type="email"
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/50 focus:border-[#7c3aed]"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+                    <input
+                      type="password"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/50 focus:border-[#7c3aed]"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end mt-2">
+                  <button type="button" onClick={openForgotPassword} className="text-sm font-semibold text-[#7c3aed] hover:text-[#6d28d9]">
+                    Forgot Password?
+                  </button>
+                </div>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full mt-4 bg-[#7c3aed] text-white py-3 rounded-lg font-semibold hover:bg-[#6d28d9] transition-colors disabled:opacity-70"
+                >
+                  {isLoading ? 'Logging in...' : 'Login'}
+                </button>
+              </form>
+            <button
+              onClick={() => setIsLoginOpen(false)}
+              className="mt-4 w-full text-slate-500 hover:text-slate-700 text-sm py-2"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      {/* Forgot Password Modal */}
+      {isForgotPasswordOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setIsForgotPasswordOpen(false)}>
+          <div className="bg-white p-8 rounded-xl max-w-md w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-2xl font-bold text-slate-900 mb-4">Reset Password</h3>
+            {!forgotOtpMode ? (
+              <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Mobile Number</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
                   <input
-                    type="tel"
-                    value={loginMobile}
-                    onChange={(e) => setLoginMobile(e.target.value)}
+                    type="email"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
                     className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/50 focus:border-[#7c3aed]"
                     required
                   />
@@ -703,9 +842,9 @@ const Navbar = () => {
                 </button>
               </form>
             ) : (
-              <form onSubmit={handleOtpSubmit} className="space-y-4">
+              <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Enter OTP sent to {loginMobile}</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Enter OTP sent to {forgotEmail}</label>
                   <input
                     type="number"
                     value={otp}
@@ -713,23 +852,28 @@ const Navbar = () => {
                     className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/50 focus:border-[#7c3aed]"
                     required
                   />
-                  <div className="flex justify-end mt-2">
-                    <button type="button" onClick={handleLoginSubmit} disabled={isLoading} className="text-sm font-semibold text-[#7c3aed] hover:text-[#6d28d9] disabled:opacity-50">
-                      Resend OTP
-                    </button>
-                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">New Password</label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#7c3aed]/50 focus:border-[#7c3aed]"
+                    required
+                  />
                 </div>
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-[#7c3aed] text-white py-3 rounded-lg font-semibold hover:bg-[#6d28d9] transition-colors disabled:opacity-70"
+                  className="w-full mt-4 bg-[#7c3aed] text-white py-3 rounded-lg font-semibold hover:bg-[#6d28d9] transition-colors disabled:opacity-70"
                 >
-                  {isLoading ? 'Verifying...' : 'Verify OTP & Login'}
+                  {isLoading ? 'Resetting...' : 'Reset Password'}
                 </button>
               </form>
             )}
             <button
-              onClick={() => setIsLoginOpen(false)}
+              onClick={() => setIsForgotPasswordOpen(false)}
               className="mt-4 w-full text-slate-500 hover:text-slate-700 text-sm py-2"
             >
               Cancel
