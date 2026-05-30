@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BASE_URL } from '../../config';
+import { fetchQuizForCourse, getCourseQuizId } from '../../utils/quizUtils';
 import Loader from '../Loader';
 
 const YouTubePlayer = ({ url, title, courseId, partNum, onVideoEnd }) => {
@@ -118,42 +119,6 @@ const YouTubePlayer = ({ url, title, courseId, partNum, onVideoEnd }) => {
       )}
     </div>
   );
-};
-
-const parseQuizResponse = (data) => {
-  if (!data) return null;
-  
-  // Format C: { quiz: { title, ... }, questions: [...] }
-  if (data.quiz && data.questions) {
-    return {
-      title: data.quiz.title || "Course Final Quiz",
-      passing_marks: data.quiz.passing_marks || data.quiz.passing_mark || 60,
-      duration: data.quiz.duration || 30,
-      questions: data.questions
-    };
-  }
-  
-  // Format B: { success: true, data: { title, questions, ... } }
-  if (data.data && (data.data.title || data.data.questions)) {
-    return {
-      title: data.data.title || "Course Final Quiz",
-      passing_marks: data.data.passing_marks || data.data.passing_mark || 60,
-      duration: data.data.duration || 30,
-      questions: data.data.questions || []
-    };
-  }
-  
-  // Format A: { title, questions, ... } directly at root
-  if (data.title || data.questions) {
-    return {
-      title: data.title || "Course Final Quiz",
-      passing_marks: data.passing_marks || data.passing_mark || 60,
-      duration: data.duration || 30,
-      questions: data.questions || []
-    };
-  }
-  
-  return null;
 };
 
 const StudentEnrolledCourses = () => {
@@ -440,6 +405,10 @@ const StudentEnrolledCourses = () => {
       setExpandedLessons({ [savedProgress]: true });
       setActiveSubLessonIndex(-1);
       setViewMode('video');
+      setQuizStarted(false);
+      setQuizData(null);
+      setQuizResult(null);
+      setSelectedAnswers({});
     }
   }, [activeCourse]);
 
@@ -452,91 +421,46 @@ const StudentEnrolledCourses = () => {
     }
   };
 
-  // Fallback Quiz questions if API doesn't return any
-  const fallbackQuiz = {
-    title: "Scouting & Guiding Core Examination",
-    passing_marks: 60,
-    questions: [
-      {
-        id: 1,
-        question: "What is the primary motto of Bharat Scouts & Guides?",
-        option1: "Be Prepared",
-        option2: "Do Your Best",
-        option3: "Serve Others",
-        option4: "Always Loyal",
-        correct_answer: "Be Prepared"
-      },
-      {
-        id: 2,
-        question: "Who is recognized as the founder of the world Scouting movement?",
-        option1: "Robert Baden-Powell",
-        option2: "Guido van Rossum",
-        option3: "Mahatma Gandhi",
-        option4: "Jawaharlal Nehru",
-        correct_answer: "Robert Baden-Powell"
-      },
-      {
-        id: 3,
-        question: "Which of these qualities is NOT a part of the official Scout Law?",
-        option1: "A Scout is courteous",
-        option2: "A Scout is a friend to animals",
-        option3: "A Scout is greedy and selfish",
-        option4: "A Scout is clean in thought, word, and deed",
-        correct_answer: "A Scout is greedy and selfish"
-      }
-    ]
-  };
-
   const loadQuiz = async () => {
     setQuizLoading(true);
     try {
-      // Start the quiz on backend
+      const quizObj = await fetchQuizForCourse(activeCourse.id, activeCourse.title);
+
+      if (!quizObj || !quizObj.questions?.length) {
+        alert('No quiz questions found for this course. Please ask your admin to add questions first.');
+        setQuizStarted(false);
+        return;
+      }
+
       const userId = localStorage.getItem('userId') || 3;
-      const cachedQuizId = localStorage.getItem(`quiz_id_course_${activeCourse.id}`) || activeCourse.id;
-      
+      const quizId = quizObj.quizId || getCourseQuizId(activeCourse.id);
+      if (!quizId) {
+        alert('Quiz not configured for this course. Please ask admin to open Quiz Management once.');
+        setQuizStarted(false);
+        return;
+      }
+
       try {
         await fetch(`${BASE_URL}/bsgupadmin/start-quiz/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             user_id: parseInt(userId, 10),
-            quiz_id: parseInt(cachedQuizId, 10)
+            quiz_id: parseInt(quizId, 10)
           })
         });
       } catch (startErr) {
-        console.error("Start quiz API failed, proceeding anyway", startErr);
+        console.error('Start quiz API failed, proceeding anyway', startErr);
       }
 
-      // Trying to fetch quiz with dynamic ID
-      const res = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?quiz_id=${cachedQuizId}`);
-      if (res.ok) {
-        const rawData = await res.json();
-        const quizObj = parseQuizResponse(rawData);
-        if (quizObj && quizObj.questions && quizObj.questions.length > 0) {
-          setQuizData(quizObj);
-        } else {
-          setQuizData(fallbackQuiz);
-        }
-      } else {
-        const fallbackRes = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?quiz_id=${activeCourse.id}`);
-        if (fallbackRes.ok) {
-          const rawData = await fallbackRes.json();
-          const quizObj = parseQuizResponse(rawData);
-          if (quizObj && quizObj.questions && quizObj.questions.length > 0) {
-            setQuizData(quizObj);
-          } else {
-            setQuizData(fallbackQuiz);
-          }
-        } else {
-          setQuizData(fallbackQuiz);
-        }
-      }
+      setQuizData(quizObj);
+      setQuizStarted(true);
     } catch (err) {
-      console.error("Quiz fetch failed, using highly optimized local fallback quiz.");
-      setQuizData(fallbackQuiz);
+      console.error('Quiz fetch failed:', err);
+      alert('Failed to load quiz. Please try again later.');
+      setQuizStarted(false);
     } finally {
       setQuizLoading(false);
-      setQuizStarted(true);
     }
   };
 
@@ -566,7 +490,12 @@ const StudentEnrolledCourses = () => {
           answer: selectedAnswers[idxKey]
         };
       });
-      const cachedQuizId = localStorage.getItem(`quiz_id_course_${activeCourse.id}`) || activeCourse.id;
+      const cachedQuizId = getCourseQuizId(activeCourse.id);
+      if (!cachedQuizId) {
+        alert('Quiz not configured for this course.');
+        setQuizLoading(false);
+        return;
+      }
 
       // 1. Submit to API
       const res = await fetch(`${BASE_URL}/bsgupadmin/submit-quiz/`, {

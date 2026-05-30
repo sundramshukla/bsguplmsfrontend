@@ -1,41 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BASE_URL } from '../../config';
-
-const parseQuizResponse = (data) => {
-  if (!data) return null;
-  
-  if (data.quiz && data.questions) {
-    return {
-      title: data.quiz.title || "Course Final Quiz",
-      passing_marks: data.quiz.passing_marks || data.quiz.passing_mark || 60,
-      duration: data.quiz.duration || 30,
-      questions: data.questions
-    };
-  }
-  
-  let qData = data.data;
-  if (Array.isArray(qData) && qData.length > 0) qData = qData[0];
-
-  if (qData && (qData.title || qData.questions)) {
-    return {
-      title: qData.title || "Course Final Quiz",
-      passing_marks: qData.passing_marks || qData.passing_mark || 60,
-      duration: qData.duration || 30,
-      questions: qData.questions || []
-    };
-  }
-  
-  if (data.title || data.questions) {
-    return {
-      title: data.title || "Course Final Quiz",
-      passing_marks: data.passing_marks || data.passing_mark || 60,
-      duration: data.duration || 30,
-      questions: data.questions || []
-    };
-  }
-  
-  return null;
-};
+import { fetchQuizForCourse, fetchQuizById, saveCourseQuizMapping, syncCourseQuizMappings } from '../../utils/quizUtils';
 
 const AdminQuizzes = () => {
   const [courses, setCourses] = useState([]);
@@ -78,48 +43,22 @@ const AdminQuizzes = () => {
     try {
       const promises = coursesList.map(async (course) => {
         try {
-          const cachedQuizId = localStorage.getItem(`quiz_id_course_${course.id}`);
-          const targetQuizId = cachedQuizId || course.id;
+          const quizResult = await fetchQuizForCourse(course.id, course.title);
+          if (!quizResult) return null;
 
-          let res = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?quiz_id=${targetQuizId}`);
-          let data = res.ok ? await res.json() : null;
-          
-          let quizObj = null;
-          if (data) {
-            if (data.title) quizObj = data;
-            else if (data.data && data.data.title) quizObj = data.data;
-            else if (Array.isArray(data.data) && data.data.length > 0 && data.data[0].title) quizObj = data.data[0];
-            else if (data.quiz && data.quiz.title) quizObj = data.quiz;
-          }
+          const qId = quizResult.quizId || localStorage.getItem(`quiz_id_course_${course.id}`);
+          if (!qId) return null;
 
-          if (!quizObj || !quizObj.title) {
-            res = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?course_id=${course.id}`);
-            data = res.ok ? await res.json() : null;
-            if (data) {
-              if (data.title) quizObj = data;
-              else if (data.data && data.data.title) quizObj = data.data;
-              else if (Array.isArray(data.data) && data.data.length > 0 && data.data[0].title) quizObj = data.data[0];
-              else if (data.quiz && data.quiz.title) quizObj = data.quiz;
-            }
-          }
-
-          if (quizObj && quizObj.title) {
-            const parsedQuiz = parseQuizResponse(data);
-            const qId = quizObj.id || quizObj.quiz_id || targetQuizId;
-            
-            localStorage.setItem(`quiz_id_course_${course.id}`, qId.toString());
-
-            return {
-              id: qId.toString(),
-              courseId: course.id.toString(),
-              title: parsedQuiz?.title || quizObj.title || `Quiz #${qId}`,
-              courseTitle: course.title,
-              total_marks: quizObj.total_marks || data.total_marks || 100,
-              passing_marks: parsedQuiz?.passing_marks || quizObj.passing_marks || 60,
-              duration: parsedQuiz?.duration || quizObj.duration || 30,
-              questions: parsedQuiz?.questions || (Array.isArray(quizObj.questions) ? quizObj.questions : [])
-            };
-          }
+          return {
+            id: qId.toString(),
+            courseId: course.id.toString(),
+            title: quizResult.title || `Quiz #${qId}`,
+            courseTitle: course.title,
+            total_marks: 100,
+            passing_marks: quizResult.passing_marks || 60,
+            duration: quizResult.duration || 30,
+            questions: quizResult.questions || []
+          };
         } catch (e) {
           // Ignore
         }
@@ -148,6 +87,7 @@ const AdminQuizzes = () => {
             setSelectedCourseId(data.data[0].id.toString());
           }
           fetchAllExistingQuizzes(data.data);
+          syncCourseQuizMappings(data.data);
         }
       } catch (err) {
         console.error('Failed to fetch courses:', err);
@@ -160,40 +100,16 @@ const AdminQuizzes = () => {
     setCheckingQuiz(true);
     setExistingQuiz(null);
     try {
-      const cachedQuizId = localStorage.getItem(`quiz_id_course_${courseId}`);
-      const targetQuizId = cachedQuizId || courseId;
+      const quizResult = await fetchQuizForCourse(courseId, courses.find(c => c.id.toString() === courseId.toString())?.title || '');
 
-      let res = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?quiz_id=${targetQuizId}`);
-      let data = res.ok ? await res.json() : null;
-      
-      let quizObj = null;
-      if (data) {
-        if (data.title) quizObj = data;
-        else if (data.data && data.data.title) quizObj = data.data;
-        else if (Array.isArray(data.data) && data.data.length > 0 && data.data[0].title) quizObj = data.data[0];
-        else if (data.quiz && data.quiz.title) quizObj = data.quiz;
-      }
-
-      if (!quizObj || !quizObj.title) {
-        res = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?course_id=${courseId}`);
-        data = res.ok ? await res.json() : null;
-        if (data) {
-          if (data.title) quizObj = data;
-          else if (data.data && data.data.title) quizObj = data.data;
-          else if (Array.isArray(data.data) && data.data.length > 0 && data.data[0].title) quizObj = data.data[0];
-          else if (data.quiz && data.quiz.title) quizObj = data.quiz;
-        }
-      }
-
-      if (quizObj && quizObj.title) {
-        const qId = quizObj.id || quizObj.quiz_id || targetQuizId;
-        const parsed = parseQuizResponse(data);
+      if (quizResult) {
+        const qId = quizResult.quizId || localStorage.getItem(`quiz_id_course_${courseId}`);
         const foundQuiz = {
           id: qId.toString(),
-          title: parsed?.title || quizObj.title || "Course Final Quiz",
-          total_marks: quizObj.total_marks || data.total_marks || 100,
-          passing_marks: parsed?.passing_marks || quizObj.passing_marks || 60,
-          duration: parsed?.duration || quizObj.duration || 30
+          title: quizResult.title || 'Course Final Quiz',
+          total_marks: 100,
+          passing_marks: quizResult.passing_marks || 60,
+          duration: quizResult.duration || 30
         };
         setExistingQuiz(foundQuiz);
         setQuizForm({
@@ -203,7 +119,7 @@ const AdminQuizzes = () => {
           duration: foundQuiz.duration
         });
         setQuizIdForQuestion(qId.toString());
-        localStorage.setItem(`quiz_id_course_${courseId}`, qId.toString());
+        saveCourseQuizMapping(courseId, qId);
         setCheckingQuiz(false);
         return;
       }
@@ -230,6 +146,7 @@ const AdminQuizzes = () => {
         duration: 30
       });
       setQuizIdForQuestion(cachedQuizId.toString());
+      saveCourseQuizMapping(courseId, cachedQuizId);
     } else {
       setQuizIdForQuestion('');
     }
@@ -307,7 +224,7 @@ const AdminQuizzes = () => {
       if (res.ok || data.success) {
         alert(data.message || data.success || (isEditing ? "Quiz Updated Successfully!" : "Quiz Created Successfully!"));
         const newQuizId = (data.data?.quiz_id || data.quiz_id || data.id || (isEditing ? existingQuiz.id : "1")).toString();
-        localStorage.setItem(`quiz_id_course_${selectedCourseId}`, newQuizId);
+        saveCourseQuizMapping(selectedCourseId, newQuizId);
         setQuizIdForQuestion(newQuizId);
         setExistingQuiz({
           id: newQuizId,
@@ -359,26 +276,36 @@ const AdminQuizzes = () => {
 
       if (res.ok || data.success) {
         alert(data.message || data.success || "Question Added Successfully!");
-        
-        const newQuestionObj = {
-          id: data.data?.question_id || data.question_id || Date.now().toString(),
-          question: questionForm.question,
-          option1: questionForm.option1,
-          option2: questionForm.option2,
-          option3: questionForm.option3,
-          option4: questionForm.option4,
-          correct_answer: questionForm.correct_answer
-        };
 
-        setAllQuizzes(prev => prev.map(q => {
-          if (q.id.toString() === quizIdForQuestion.toString()) {
-            return {
-              ...q,
-              questions: [...(q.questions || []), newQuestionObj]
-            };
-          }
-          return q;
-        }));
+        const refreshed = await fetchQuizById(quizIdForQuestion);
+        if (refreshed) {
+          setAllQuizzes(prev => prev.map(q => {
+            if (q.id.toString() === quizIdForQuestion.toString()) {
+              return { ...q, questions: refreshed.questions };
+            }
+            return q;
+          }));
+        } else {
+          const newQuestionObj = {
+            id: data.data?.question_id || data.question_id || Date.now().toString(),
+            question: questionForm.question,
+            option1: questionForm.option1,
+            option2: questionForm.option2,
+            option3: questionForm.option3,
+            option4: questionForm.option4,
+            correct_answer: questionForm.correct_answer
+          };
+
+          setAllQuizzes(prev => prev.map(q => {
+            if (q.id.toString() === quizIdForQuestion.toString()) {
+              return {
+                ...q,
+                questions: [...(q.questions || []), newQuestionObj]
+              };
+            }
+            return q;
+          }));
+        }
 
         setQuestionForm({
           question: '',
@@ -497,33 +424,43 @@ const AdminQuizzes = () => {
 
       if (res.ok || data.success) {
         alert(data.message || data.success || (isEditing ? "Question Updated Successfully!" : "Question Added Successfully!"));
-        
-        const newQuestionObj = {
-          id: isEditing ? activeEditQuestionId : (data.data?.question_id || data.question_id || Date.now().toString()),
-          question: modalQuestionForm.question,
-          option1: modalQuestionForm.option1,
-          option2: modalQuestionForm.option2,
-          option3: modalQuestionForm.option3,
-          option4: modalQuestionForm.option4,
-          correct_answer: modalQuestionForm.correct_answer
-        };
 
-        setAllQuizzes(prev => prev.map(q => {
-          if (q.id.toString() === activeAddQuestionQuizId.toString()) {
-            if (isEditing) {
-               return {
-                 ...q,
-                 questions: q.questions.map(quest => (quest.id || quest.question_id || quest.order)?.toString() === activeEditQuestionId.toString() ? newQuestionObj : quest)
-               };
-            } else {
-               return {
-                 ...q,
-                 questions: [...(q.questions || []), newQuestionObj]
-               };
+        const refreshed = await fetchQuizById(activeAddQuestionQuizId);
+        if (refreshed) {
+          setAllQuizzes(prev => prev.map(q => {
+            if (q.id.toString() === activeAddQuestionQuizId.toString()) {
+              return { ...q, questions: refreshed.questions };
             }
-          }
-          return q;
-        }));
+            return q;
+          }));
+        } else {
+          const newQuestionObj = {
+            id: isEditing ? activeEditQuestionId : (data.data?.question_id || data.question_id || Date.now().toString()),
+            question: modalQuestionForm.question,
+            option1: modalQuestionForm.option1,
+            option2: modalQuestionForm.option2,
+            option3: modalQuestionForm.option3,
+            option4: modalQuestionForm.option4,
+            correct_answer: modalQuestionForm.correct_answer
+          };
+
+          setAllQuizzes(prev => prev.map(q => {
+            if (q.id.toString() === activeAddQuestionQuizId.toString()) {
+              if (isEditing) {
+                 return {
+                   ...q,
+                   questions: q.questions.map(quest => (quest.id || quest.question_id || quest.order)?.toString() === activeEditQuestionId.toString() ? newQuestionObj : quest)
+                 };
+              } else {
+                 return {
+                   ...q,
+                   questions: [...(q.questions || []), newQuestionObj]
+                 };
+              }
+            }
+            return q;
+          }));
+        }
 
         setModalQuestionForm({
           question: '',
