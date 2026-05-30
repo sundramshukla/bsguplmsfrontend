@@ -542,9 +542,9 @@ const AdminQuizzes = () => {
   };
 
   return (
-    <div className="p-6 text-left space-y-8">
+    <div className="p-4 sm:p-6 text-left space-y-8">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-3xl font-extrabold text-slate-800">Manage Quizzes & Questions</h2>
+        <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-800">Manage Quizzes & Questions</h2>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -792,20 +792,20 @@ const AdminQuizzes = () => {
       </div>
 
       {/* Premium Dashboard section: All Quizzes & Questions */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+      <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-4">
           <div>
-            <h3 className="text-2xl font-bold text-slate-800">All Quizzes & Created Questions</h3>
-            <p className="text-sm text-slate-500 mt-1">View and manage all course quizzes and their respective MCQ questions.</p>
+            <h3 className="text-xl sm:text-2xl font-bold text-slate-800">All Quizzes & Created Questions</h3>
+            <p className="text-xs sm:text-sm text-slate-500 mt-1">View and manage all course quizzes and their respective MCQ questions.</p>
           </div>
           
           {/* Dropdown to Filter by Course/Project */}
-          <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full md:w-auto shrink-0">
             <span className="text-sm font-semibold text-slate-600 whitespace-nowrap">🔍 Filter by Course:</span>
             <select
               value={filterCourseId}
               onChange={(e) => setFilterCourseId(e.target.value)}
-              className="border-2 border-slate-200 rounded-xl p-2 font-medium text-sm text-slate-700 focus:border-[#7c3aed] focus:outline-none min-w-[200px] max-w-xs bg-white cursor-pointer"
+              className="border-2 border-slate-200 rounded-xl p-2.5 font-medium text-sm text-slate-700 focus:border-[#7c3aed] focus:outline-none w-full sm:min-w-[200px] sm:max-w-xs bg-white cursor-pointer"
             >
               <option value="all">✨ Show All Courses</option>
               {courses.map(c => (
