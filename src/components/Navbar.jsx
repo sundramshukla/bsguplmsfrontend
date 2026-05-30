@@ -3,6 +3,13 @@ import "../CSS/style.css";
 import { BASE_URL } from '../config';
 
 const Navbar = () => {
+  const [toast, setToast] = useState(null);
+  const showAlert = (msg) => {
+    const isError = msg.toLowerCase().includes('failed') || msg.toLowerCase().includes('error') || msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('please');
+    setToast({ msg, type: isError ? 'error' : 'success' });
+    setTimeout(() => setToast(null), 4000);
+  };
+
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(localStorage.getItem('isLoggedIn') === 'true');
@@ -185,7 +192,7 @@ const Navbar = () => {
            setIsLoginOpen(false);
            setOtpMode(false);
            setProfileMode(false);
-           alert("Welcome, Administrator!");
+           showAlert("Welcome, Administrator!");
            return;
         }
         
@@ -244,7 +251,7 @@ const Navbar = () => {
            setIsRegisterOpen(false);
            setOtpMode(false);
            setIsLoginOpen(true);
-           alert("Registration successful! Please login with your email and password to continue.");
+           showAlert("Registration successful! Please login with your email and password to continue.");
         } else {
            // Fallback if authType is somehow missing
            setIsLoggedIn(true);
@@ -264,7 +271,7 @@ const Navbar = () => {
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
     if (!formData.email || !formData.password) {
-      alert('Please provide email and password.');
+      showAlert('Please provide email and password.');
       return;
     }
     
@@ -280,15 +287,15 @@ const Navbar = () => {
       if (res.ok) {
         const data = await res.json();
         console.log("Register response:", data);
-        alert(`Development Info: The OTP is ${data.otp || 'sent'}`);
+        showAlert(`Development Info: The OTP is ${data.otp || 'sent'}`);
         setAuthType('register');
         setOtpMode(true);
       } else {
-        alert("Failed to send OTP for registration. Check email/password.");
+        showAlert("Failed to send OTP for registration. Check email/password.");
       }
     } catch (err) {
       console.error(err);
-      alert("Error sending OTP");
+      showAlert("Error sending OTP");
     } finally {
       setIsLoading(false);
     }
@@ -297,7 +304,7 @@ const Navbar = () => {
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
     if (!loginEmail || !loginPassword) {
-      alert('Please provide email and password.');
+      showAlert('Please provide email and password.');
       return;
     }
 
@@ -317,11 +324,11 @@ const Navbar = () => {
         setAuthType('login');
         await processAuthSuccess(data, 'login', loginEmail);
       } else {
-        alert("Invalid credentials or login failed.");
+        showAlert("Invalid credentials or login failed.");
       }
     } catch (err) {
       console.error(err);
-      alert("Error during login");
+      showAlert("Error during login");
     } finally {
       setIsLoading(false);
     }
@@ -330,7 +337,7 @@ const Navbar = () => {
   const handleOtpSubmit = async (e) => {
     e.preventDefault();
     if (!otp) {
-      alert("Please enter OTP");
+      showAlert("Please enter OTP");
       return;
     }
 
@@ -358,11 +365,11 @@ const Navbar = () => {
         const data = await res.json().catch(() => ({}));
         await processAuthSuccess(data, 'register', formData.email);
       } else {
-        alert("Invalid OTP or error occurred.");
+        showAlert("Invalid OTP or error occurred.");
       }
     } catch (err) {
       console.error(err);
-      alert("Error verifying OTP");
+      showAlert("Error verifying OTP");
     } finally {
       setIsLoading(false);
     }
@@ -399,11 +406,11 @@ const Navbar = () => {
       } else {
         const errorData = await res.json().catch(() => ({}));
         console.error("Profile saving error:", errorData);
-        alert("Failed to save profile. Please check the inputs.");
+        showAlert("Failed to save profile. Please check the inputs.");
       }
     } catch (err) {
       console.error(err);
-      alert("Error saving profile");
+      showAlert("Error saving profile");
     } finally {
       setIsLoading(false);
     }
@@ -422,7 +429,7 @@ const Navbar = () => {
   const handleForgotPasswordSubmit = async (e) => {
     e.preventDefault();
     if (!forgotEmail) {
-      alert('Please provide email.');
+      showAlert('Please provide email.');
       return;
     }
 
@@ -432,14 +439,14 @@ const Navbar = () => {
       const res = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
       if (res.ok) {
         const data = await res.json();
-        alert(`Development Info: The OTP is ${data.otp || 'sent'}`);
+        showAlert(`Development Info: The OTP is ${data.otp || 'sent'}`);
         setForgotOtpMode(true);
       } else {
-        alert("Failed to send OTP for reset password. Check your email.");
+        showAlert("Failed to send OTP for reset password. Check your email.");
       }
     } catch (err) {
       console.error(err);
-      alert("Error sending OTP");
+      showAlert("Error sending OTP");
     } finally {
       setIsLoading(false);
     }
@@ -448,7 +455,7 @@ const Navbar = () => {
   const handleResetPasswordSubmit = async (e) => {
     e.preventDefault();
     if (!otp || !newPassword) {
-      alert('Please provide OTP and new password.');
+      showAlert('Please provide OTP and new password.');
       return;
     }
 
@@ -461,16 +468,16 @@ const Navbar = () => {
         body: JSON.stringify({ email: forgotEmail, otp: otp, new_password: newPassword })
       });
       if (res.ok) {
-        alert("Password reset successfully! Please login with your new password.");
+        showAlert("Password reset successfully! Please login with your new password.");
         setIsForgotPasswordOpen(false);
         setForgotOtpMode(false);
         openLogin();
       } else {
-        alert("Invalid OTP or error occurred.");
+        showAlert("Invalid OTP or error occurred.");
       }
     } catch (err) {
       console.error(err);
-      alert("Error verifying OTP");
+      showAlert("Error verifying OTP");
     } finally {
       setIsLoading(false);
     }
@@ -638,12 +645,19 @@ const Navbar = () => {
           </div>
         )}
       </header>
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed top-6 right-6 z-[9999] px-6 py-3 rounded-xl shadow-2xl text-white font-bold text-sm tracking-wide transition-all transform animate-in slide-in-from-top-5 fade-in duration-300 ${toast.type === 'error' ? 'bg-red-500' : 'bg-emerald-500'}`}>
+          {toast.msg}
+        </div>
+      )}
+
 
       {/* Register Modal */}
       {isRegisterOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setIsRegisterOpen(false)}>
           <div className="bg-white p-8 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-2xl font-bold text-slate-900 mb-4">{profileMode ? 'Complete Your Profile' : 'Register for Beginner Course'}</h3>
+            <h3 className="text-2xl font-bold text-slate-900 mb-4">{profileMode ? 'Complete Your Profile' : 'Register for BSGUP'}</h3>
             {!otpMode && !profileMode && (
               <form onSubmit={handleRegisterSubmit} className="space-y-4">
                 <div className="space-y-4">
