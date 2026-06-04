@@ -1,12 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { BASE_URL } from '../../config';
+import { getEnrolledCourseIds } from '../../utils/enrollmentUtils';
+import {
+  processCourseEnrollment,
+  navigateToPaymentResult,
+  appendLocalPaymentHistory
+} from '../../utils/paymentUtils';
 import Loader from '../Loader';
 
 const StudentDepartmentCourses = ({ department, title }) => {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [enrolledCourseIds, setEnrolledCourseIds] = useState([]);
   const [activePaymentCourse, setActivePaymentCourse] = useState(null);
   const [isPaying, setIsPaying] = useState(false);
+
+  const userId = localStorage.getItem('userId') || 'guest';
+
+  const refreshEnrollments = async () => {
+    if (!userId || userId === 'guest') {
+      setEnrolledCourseIds([]);
+      return;
+    }
+    const ids = await getEnrolledCourseIds(userId);
+    setEnrolledCourseIds(ids);
+  };
 
   useEffect(() => {
     const fetchCourses = async () => {
@@ -27,43 +45,81 @@ const StudentDepartmentCourses = ({ department, title }) => {
       }
     };
     fetchCourses();
+    refreshEnrollments();
   }, [department]);
 
-  const handleEnroll = (course) => {
-    const userId = localStorage.getItem('userId') || 'guest';
-    const key = `enrolledCourses_${userId}`;
-    const enrolledStr = localStorage.getItem(key) || '[]';
-    const enrolled = JSON.parse(enrolledStr);
-    
-    if (enrolled.includes(course.id)) {
-      alert("You are already enrolled in this course!");
+  useEffect(() => {
+    const handleEnrollmentChange = () => refreshEnrollments();
+    window.addEventListener('enrollmentChange', handleEnrollmentChange);
+    return () => window.removeEventListener('enrollmentChange', handleEnrollmentChange);
+  }, [userId]);
+
+  const runEnrollment = async (course) => {
+    setIsPaying(true);
+    try {
+      const result = await processCourseEnrollment({
+        userId,
+        courseId: course.id,
+        courseTitle: course.title,
+        coursePrice: course.price
+      });
+
+      if (result.status === 'already_enrolled') {
+        alert(result.message || 'You are already enrolled in this course!');
+        await refreshEnrollments();
+        return;
+      }
+
+      if (result.type === 'paid') {
+        appendLocalPaymentHistory(userId, {
+          courseTitle: course.title,
+          amount: result.amount,
+          status: 'Paid'
+        });
+      }
+
+      await refreshEnrollments();
+      navigateToPaymentResult('success', {
+        message: result.message,
+        courseTitle: course.title,
+        amount: result.amount,
+        orderId: result.orderId
+      });
+    } catch (err) {
+      console.error(err);
+      navigateToPaymentResult('failed', {
+        message: err.message || 'Payment failed. Please try again.',
+        courseTitle: course.title,
+        amount: course.price
+      });
+    } finally {
+      setIsPaying(false);
+      setActivePaymentCourse(null);
+    }
+  };
+
+  const handleEnroll = async (course) => {
+    if (!userId || userId === 'guest') {
+      alert('Please log in to enroll in this course.');
       return;
     }
-    
+
+    if (enrolledCourseIds.some((id) => id.toString() === course.id.toString())) {
+      alert('You are already enrolled in this course!');
+      return;
+    }
+
     const isFree = course.price == 0 || course.price == '0' || course.price == '0.00';
     if (isFree) {
-      enrolled.push(course.id);
-      localStorage.setItem(key, JSON.stringify(enrolled));
-      alert(`Successfully enrolled in "${course.title}" for Free! You can now access it in "Enrolled Courses".`);
+      await runEnrollment(course);
     } else {
       setActivePaymentCourse(course);
     }
   };
 
-  const executePayment = () => {
-    setIsPaying(true);
-    setTimeout(() => {
-      const userId = localStorage.getItem('userId') || 'guest';
-      const key = `enrolledCourses_${userId}`;
-      const enrolledStr = localStorage.getItem(key) || '[]';
-      const enrolled = JSON.parse(enrolledStr);
-      enrolled.push(activePaymentCourse.id);
-      localStorage.setItem(key, JSON.stringify(enrolled));
-      
-      setIsPaying(false);
-      alert(`Payment Successful! You are now enrolled in "${activePaymentCourse.title}". You can access it in the "Enrolled Courses" tab.`);
-      setActivePaymentCourse(null);
-    }, 1500);
+  const executePayment = async () => {
+    if (!activePaymentCourse) return;
+    await runEnrollment(activePaymentCourse);
   };
 
   return (
@@ -78,11 +134,7 @@ const StudentDepartmentCourses = ({ department, title }) => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {courses.map(course => {
-            const userId = localStorage.getItem('userId') || 'guest';
-            const key = `enrolledCourses_${userId}`;
-            const enrolledStr = localStorage.getItem(key) || '[]';
-            const enrolled = JSON.parse(enrolledStr);
-            const isEnrolled = enrolled.includes(course.id);
+            const isEnrolled = enrolledCourseIds.some((id) => id.toString() === course.id.toString());
             const isFree = course.price == 0 || course.price == '0' || course.price == '0.00';
 
             return (
@@ -126,7 +178,7 @@ const StudentDepartmentCourses = ({ department, title }) => {
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl p-6 border border-slate-100 relative">
             <h3 className="text-2xl font-bold text-slate-800 mb-2">Buy Course</h3>
-            <p className="text-slate-500 mb-6">Complete your payment to unlock full access to this course.</p>
+            <p className="text-slate-500 mb-6">You will be redirected to Razorpay to complete your secure payment.</p>
             
             <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 mb-6 text-left">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Course Title</p>
@@ -150,7 +202,7 @@ const StudentDepartmentCourses = ({ department, title }) => {
                     Processing Payment...
                   </>
                 ) : (
-                  `Pay ₹${activePaymentCourse.price} & Enroll Now`
+                  `Pay ₹${activePaymentCourse.price} with Razorpay`
                 )}
               </button>
               <button 

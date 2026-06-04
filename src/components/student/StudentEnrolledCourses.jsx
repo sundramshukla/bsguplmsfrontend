@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BASE_URL } from '../../config';
 import { fetchQuizForCourse, getCourseQuizId } from '../../utils/quizUtils';
+import { getEnrolledCourseIds } from '../../utils/enrollmentUtils';
 import Loader from '../Loader';
 
 const YouTubePlayer = ({ url, title, courseId, partNum, onVideoEnd }) => {
@@ -350,15 +351,19 @@ const StudentEnrolledCourses = () => {
     const fetchCourses = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`${BASE_URL}/bsgupadmin/createcourse/`);
-        const data = await res.json();
+        const userId = localStorage.getItem('userId') || 'guest';
+        const [coursesRes, enrolledIds] = await Promise.all([
+          fetch(`${BASE_URL}/bsgupadmin/createcourse/`),
+          userId !== 'guest' ? getEnrolledCourseIds(userId) : Promise.resolve([])
+        ]);
+        const data = await coursesRes.json();
         if (data.success && data.data) {
-          const userId = localStorage.getItem('userId') || 'guest';
-          const key = `enrolledCourses_${userId}`;
-          const enrolledStr = localStorage.getItem(key) || '[]';
-          const enrolled = JSON.parse(enrolledStr);
-          // filter only the courses student is enrolled in
-          const filtered = data.data.filter(course => enrolled.includes(course.id));
+          const enrolled = enrolledIds.length
+            ? enrolledIds
+            : JSON.parse(localStorage.getItem(`enrolledCourses_${userId}`) || '[]');
+          const filtered = data.data.filter((course) =>
+            enrolled.some((id) => id.toString() === course.id.toString())
+          );
           setCourses(filtered);
         }
       } catch (err) {
@@ -370,6 +375,10 @@ const StudentEnrolledCourses = () => {
 
     fetchProfileName();
     fetchCourses();
+
+    const handleEnrollmentChange = () => fetchCourses();
+    window.addEventListener('enrollmentChange', handleEnrollmentChange);
+    return () => window.removeEventListener('enrollmentChange', handleEnrollmentChange);
   }, [activeCourse]);
 
   useEffect(() => {

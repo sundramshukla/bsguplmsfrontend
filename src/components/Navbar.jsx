@@ -219,6 +219,9 @@ const Navbar = () => {
                  if (profileObj && profileObj.full_name) {
                    profileExists = true;
                    profileName = profileObj.full_name;
+                   if (profileObj.id) {
+                     localStorage.setItem('profileId', profileObj.id.toString());
+                   }
                  }
                }
              } catch (err) {

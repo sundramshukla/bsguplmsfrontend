@@ -30,6 +30,7 @@ const StudentProfile = () => {
       }
       
       if (profileData && profileData.id) {
+        localStorage.setItem('profileId', profileData.id.toString());
         setProfile(profileData);
         setFormData({
           full_name: profileData.full_name || '',

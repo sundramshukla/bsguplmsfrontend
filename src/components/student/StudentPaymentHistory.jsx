@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 const StudentPaymentHistory = () => {
-  const payments = [
-    { id: 'INV-2026-001', date: '12 Jan 2026', course: 'Advanced React Patterns', amount: '₹ 4,500', status: 'Paid', method: 'Credit Card' },
-    { id: 'INV-2026-002', date: '05 Mar 2026', course: 'Fullstack Django & React', amount: '₹ 8,000', status: 'Paid', method: 'UPI' },
-    { id: 'INV-2026-003', date: '20 Apr 2026', course: 'Data Science Fundamentals', amount: '₹ 12,000', status: 'Failed', method: 'Net Banking' },
-  ];
+  const [payments, setPayments] = useState([]);
+
+  useEffect(() => {
+    const userId = localStorage.getItem('userId') || 'guest';
+    const key = `paymentHistory_${userId}`;
+    const history = JSON.parse(localStorage.getItem(key) || '[]');
+    setPayments(history);
+  }, []);
 
   return (
     <div className="p-6">
@@ -25,11 +28,10 @@ const StudentPaymentHistory = () => {
                 <th className="py-4 px-6">Amount</th>
                 <th className="py-4 px-6">Method</th>
                 <th className="py-4 px-6">Status</th>
-                <th className="py-4 px-6 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
-              {payments.map(payment => (
+              {payments.map((payment) => (
                 <tr key={payment.id} className="hover:bg-slate-50 transition-colors">
                   <td className="py-4 px-6 font-medium text-slate-800">{payment.id}</td>
                   <td className="py-4 px-6 text-slate-600">{payment.date}</td>
@@ -37,24 +39,23 @@ const StudentPaymentHistory = () => {
                   <td className="py-4 px-6 font-bold text-slate-700">{payment.amount}</td>
                   <td className="py-4 px-6 text-slate-500">{payment.method}</td>
                   <td className="py-4 px-6">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      payment.status === 'Paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-                    }`}>
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        payment.status === 'Paid'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-rose-100 text-rose-700'
+                      }`}
+                    >
                       {payment.status}
                     </span>
-                  </td>
-                  <td className="py-4 px-6 text-right">
-                    {payment.status === 'Paid' && (
-                      <button className="text-emerald-600 font-semibold hover:text-emerald-800 flex items-center justify-end w-full gap-1">
-                        <span>⬇️</span> Invoice
-                      </button>
-                    )}
                   </td>
                 </tr>
               ))}
               {payments.length === 0 && (
                 <tr>
-                   <td colSpan="7" className="p-10 text-center text-slate-500">No payment history found.</td>
+                  <td colSpan="6" className="p-10 text-center text-slate-500">
+                    No payment history found.
+                  </td>
                 </tr>
               )}
             </tbody>

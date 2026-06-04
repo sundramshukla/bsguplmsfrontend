@@ -115,7 +115,24 @@ export const fetchQuizForCourse = async (courseId, courseTitle = '') => {
     };
   };
 
-  // 1. Use saved course → quiz mapping (set when admin creates quiz)
+  // 1. Use quiz id from enrollment API mapping
+  const enrollmentQuizId = (() => {
+    try {
+      const map = JSON.parse(localStorage.getItem('bsgup_enrollment_quiz_map') || '{}');
+      return map[courseIdStr] || null;
+    } catch {
+      return null;
+    }
+  })();
+  if (enrollmentQuizId) {
+    const enrollmentResult = await tryFetch(
+      `${BASE_URL}/bsgupadmin/get-quiz/?quiz_id=${enrollmentQuizId}`,
+      courseIdStr
+    );
+    if (enrollmentResult) return enrollmentResult;
+  }
+
+  // 2. Use saved course → quiz mapping (set when admin creates quiz)
   const mappedQuizId = getCourseQuizId(courseIdStr);
   if (mappedQuizId) {
     const mappedResult = await tryFetch(

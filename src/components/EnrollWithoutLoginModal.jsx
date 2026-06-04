@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { BASE_URL } from '../config';
+import { processCourseEnrollment, navigateToPaymentResult } from '../utils/paymentUtils';
 
 const EnrollWithoutLoginModal = ({ isOpen, onClose, courseId }) => {
   const [step, setStep] = useState(1);
@@ -69,30 +70,36 @@ const EnrollWithoutLoginModal = ({ isOpen, onClose, courseId }) => {
         const data = await res.json().catch(() => ({}));
         alert('Successfully enrolled!');
         
-        // Extract userId and update local enrolled courses list
         const userId = data.user_id || data.id || localStorage.getItem('userId') || '3';
-        const key = `enrolledCourses_${userId}`;
-        const enrolled = JSON.parse(localStorage.getItem(key) || '[]');
-        if (!enrolled.includes(parseInt(courseId, 10))) {
-          enrolled.push(parseInt(courseId, 10));
-          localStorage.setItem(key, JSON.stringify(enrolled));
-        }
-
-        // Auto-login if backend returns authentication credentials
         localStorage.setItem('isLoggedIn', 'true');
         localStorage.setItem('role', 'student');
-        localStorage.setItem('userId', userId);
+        localStorage.setItem('userId', userId.toString());
         if (data.token || data.jwt || data.access) {
           localStorage.setItem('token', data.token || data.jwt || data.access);
         }
+
         window.dispatchEvent(new Event('authChange'));
-        
-        window.dispatchEvent(new Event('storage'));
         onClose();
         setStep(1);
-        
-        // Redirect to student panel immediately
-        window.location.hash = '#student';
+
+        try {
+          const result = await processCourseEnrollment({
+            userId: userId.toString(),
+            courseId,
+            courseTitle: formData.full_name ? `Course #${courseId}` : `Course #${courseId}`,
+            coursePrice: 0
+          });
+          navigateToPaymentResult('success', {
+            message: result.message,
+            courseId
+          });
+        } catch (enrollErr) {
+          console.error(enrollErr);
+          navigateToPaymentResult('failed', {
+            message: enrollErr.message || 'Enrollment failed',
+            courseId
+          });
+        }
       } else {
         alert('Invalid OTP. Please try again.');
       }

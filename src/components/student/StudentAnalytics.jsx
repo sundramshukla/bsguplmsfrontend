@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BASE_URL } from '../../config';
+import { getEnrolledCourseIds } from '../../utils/enrollmentUtils';
 
 const StudentAnalytics = ({ onNavigate }) => {
   const [stats, setStats] = useState({
@@ -11,16 +12,19 @@ const StudentAnalytics = ({ onNavigate }) => {
   useEffect(() => {
     const fetchStats = async () => {
       const userId = localStorage.getItem('userId') || 'guest';
-      
-      // 1. Get lists from local storage
-      const enrolledKey = `enrolledCourses_${userId}`;
-      const enrolledList = JSON.parse(localStorage.getItem(enrolledKey) || '[]');
-      
+
       const completedKey = `completedCourses_${userId}`;
       const completedList = JSON.parse(localStorage.getItem(completedKey) || '[]');
-      
+
       const certKey = `earnedCertificates_${userId}`;
       const certList = JSON.parse(localStorage.getItem(certKey) || '[]');
+
+      let enrolledList = [];
+      if (userId !== 'guest') {
+        enrolledList = await getEnrolledCourseIds(userId);
+      } else {
+        enrolledList = JSON.parse(localStorage.getItem(`enrolledCourses_${userId}`) || '[]');
+      }
 
       try {
         const res = await fetch(`${BASE_URL}/bsgupadmin/createcourse/`);
@@ -33,8 +37,7 @@ const StudentAnalytics = ({ onNavigate }) => {
           const validCompleted = completedList.filter(id => activeCourseIds.includes(id.toString()));
           const validCerts = certList.filter(id => activeCourseIds.includes(id.toString()));
           
-          // Cleanup deleted courses from local storage
-          localStorage.setItem(enrolledKey, JSON.stringify(validEnrolled));
+          localStorage.setItem(`enrolledCourses_${userId}`, JSON.stringify(validEnrolled));
           localStorage.setItem(completedKey, JSON.stringify(validCompleted));
           localStorage.setItem(certKey, JSON.stringify(validCerts));
 
@@ -49,7 +52,6 @@ const StudentAnalytics = ({ onNavigate }) => {
         console.error("Failed to fetch courses for analytics:", err);
       }
 
-      // Fallback
       setStats({
         coursesEnrolled: enrolledList.length,
         coursesCompleted: completedList.length,

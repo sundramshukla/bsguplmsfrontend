@@ -9,6 +9,7 @@ import Testimonials from './components/Testimonials.jsx'
 import ContactSection from './components/ContactSection.jsx'
 import AdminPanel from './components/admin/AdminPanel.jsx'
 import StudentPanel from './components/student/StudentPanel.jsx'
+import PaymentResult from './components/PaymentResult.jsx'
 
 function App() {
   const [currentHash, setCurrentHash] = useState(window.location.hash);
@@ -35,7 +36,13 @@ function App() {
     };
   }, []);
 
+  const isPaymentResultRoute =
+    currentHash === '#payment/success' || currentHash === '#payment/failed';
+
   const renderContent = () => {
+    if (isPaymentResultRoute) {
+      return <PaymentResult />;
+    }
     switch(currentHash) {
       case '#courses':
         return <CoursesPage />;
@@ -53,7 +60,7 @@ function App() {
   const isStudentPath = window.location.pathname === '/student' || window.location.pathname.startsWith('/student/');
   const isStudentRoute = currentHash === '#student' || currentHash.startsWith('#student/') || isStudentPath;
 
-  const isFullScreenApp = isAdminRoute || isStudentRoute;
+  const isFullScreenApp = isAdminRoute || isStudentRoute || isPaymentResultRoute;
 
   return (
     <div className={`min-h-screen bg-white text-slate-800 flex flex-col ${isFullScreenApp ? 'h-screen overflow-hidden' : ''}`}>

@@ -1,4 +1,3 @@
-const fetch = require('node-fetch');
 const BASE_URL = 'https://api.bsguplms.in';
 
 async function test() {

@@ -2,6 +2,12 @@ import React, { useState, useEffect } from "react";
 import Navbar from './Navbar';
 import Footer from './Footer';
 import { BASE_URL } from '../config';
+import { isUserEnrolledInCourse } from '../utils/enrollmentUtils';
+import {
+  processCourseEnrollment,
+  navigateToPaymentResult,
+  appendLocalPaymentHistory
+} from '../utils/paymentUtils';
 import Loader from './Loader';
 
 const DEPARTMENTS_MAP = {
@@ -18,6 +24,7 @@ const CoursesPage = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(localStorage.getItem('isLoggedIn') === 'true');
   const [enrollModalOpen, setEnrollModalOpen] = useState(false);
   const [selectedCourseId, setSelectedCourseId] = useState(null);
+  const [enrollingCourseId, setEnrollingCourseId] = useState(null);
   const cardsPerPage = 6;
 
   useEffect(() => {
@@ -80,48 +87,62 @@ const CoursesPage = () => {
     setCurrentPage(page);
   };
 
-  const handleLoggedInEnroll = (course) => {
-    const userId = localStorage.getItem('userId') || '3';
-    const key = `enrolledCourses_${userId}`;
-    const enrolledStr = localStorage.getItem(key) || '[]';
-    const enrolled = JSON.parse(enrolledStr);
-
-    if (enrolled.includes(course.id)) {
-      alert("You are already enrolled in this course!");
-      window.location.hash = '#student';
+  const handleLoggedInEnroll = async (course) => {
+    const userId = localStorage.getItem('userId');
+    if (!userId) {
+      alert('Please sign up or log in to enroll in this course!');
       return;
     }
 
-    const isFree = course.price == 0 || course.price == '0' || course.price == '0.00';
-
-    if (isFree) {
-      enrolled.push(course.id);
-      localStorage.setItem(key, JSON.stringify(enrolled));
-      alert(`Successfully enrolled in "${course.title}" for Free! You can now start learning.`);
-      window.location.hash = '#student';
-      window.dispatchEvent(new Event('storage'));
-    } else {
-      const confirmPayment = window.confirm(`Proceed to secure payment of ₹${course.price} to enroll in "${course.title}"?`);
-      if (confirmPayment) {
-        enrolled.push(course.id);
-        localStorage.setItem(key, JSON.stringify(enrolled));
-        
-        // Track payment history
-        const paymentKey = `paymentHistory_${userId}`;
-        const paymentHistory = JSON.parse(localStorage.getItem(paymentKey) || '[]');
-        paymentHistory.push({
-          id: Date.now(),
-          courseTitle: course.title,
-          amount: course.price,
-          date: new Date().toLocaleDateString(),
-          status: 'Success'
-        });
-        localStorage.setItem(paymentKey, JSON.stringify(paymentHistory));
-
-        alert(`Payment of ₹${course.price} Successful! You are now enrolled in "${course.title}".`);
+    try {
+      const alreadyEnrolled = await isUserEnrolledInCourse(userId, course.id);
+      if (alreadyEnrolled) {
+        alert('You are already enrolled in this course!');
         window.location.hash = '#student';
-        window.dispatchEvent(new Event('storage'));
+        return;
       }
+    } catch (err) {
+      console.warn('Could not verify enrollment status:', err);
+    }
+
+    setEnrollingCourseId(course.id);
+    try {
+      const result = await processCourseEnrollment({
+        userId,
+        courseId: course.id,
+        courseTitle: course.title,
+        coursePrice: course.price
+      });
+
+      if (result.status === 'already_enrolled') {
+        alert(result.message || 'You are already enrolled in this course!');
+        window.location.hash = '#student';
+        return;
+      }
+
+      if (result.type === 'paid') {
+        appendLocalPaymentHistory(userId, {
+          courseTitle: course.title,
+          amount: result.amount,
+          status: 'Paid'
+        });
+      }
+
+      navigateToPaymentResult('success', {
+        message: result.message,
+        courseTitle: course.title,
+        amount: result.amount,
+        orderId: result.orderId
+      });
+    } catch (err) {
+      console.error(err);
+      navigateToPaymentResult('failed', {
+        message: err.message || 'Payment failed. Please try again.',
+        courseTitle: course.title,
+        amount: course.price
+      });
+    } finally {
+      setEnrollingCourseId(null);
     }
   };
 
@@ -198,9 +219,14 @@ const CoursesPage = () => {
                   {isLoggedIn ? (
                     <button 
                       onClick={() => handleLoggedInEnroll(course)}
-                      className="w-full bg-[#10b981] text-white py-2.5 rounded-lg font-semibold hover:bg-[#059669] transition-colors"
+                      disabled={enrollingCourseId === course.id}
+                      className="w-full bg-[#10b981] text-white py-2.5 rounded-lg font-semibold hover:bg-[#059669] transition-colors disabled:opacity-60"
                     >
-                      {course.price == 0 || course.price == '0' || course.price == '0.00' ? 'Start Free Course' : 'Enroll & Pay'}
+                      {enrollingCourseId === course.id
+                        ? 'Processing...'
+                        : course.price == 0 || course.price == '0' || course.price == '0.00'
+                          ? 'Start Free Course'
+                          : 'Enroll & Pay via Razorpay'}
                     </button>
                   ) : (
                     <button 
