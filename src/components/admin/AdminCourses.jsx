@@ -128,6 +128,8 @@ const AdminCourses = () => {
     
     if (isEditing) {
       fd.append('course_id', editingCourse.id);
+    } else {
+      fd.append('is_active', 'true');
     }
     
     if (file) {
