@@ -1,108 +1,64 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BASE_URL } from '../../config';
+import { getAdminUserId } from '../../utils/adminAnalyticsUtils';
 
-const StudentPaymentHistory = () => {
+const AdminPaymentHistory = () => {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    const fetchPayments = async () => {
+    const loadPayments = async () => {
       setLoading(true);
       setError('');
       try {
-        const userId = localStorage.getItem('userId') || 'guest';
-        const studentEmail = localStorage.getItem('studentEmail') || '';
-        const studentName = localStorage.getItem('studentName') || '';
-
-        // 1. Load local payments
-        const key = `paymentHistory_${userId}`;
-        const localHistory = JSON.parse(localStorage.getItem(key) || '[]');
-
-        // 2. Fetch backend payments
-        let backendPayments = [];
-        try {
-          const res = await fetch(`${BASE_URL}/bsgupadmin/admindashboard/?user_id=1`, {
-            credentials: 'include'
-          });
-          const data = await res.json();
-          if (data.success && data.data && data.data.recent_payments) {
-            // Filter by student email or name
-            backendPayments = data.data.recent_payments.filter(p => 
-              (studentEmail && p.user && p.user.toLowerCase() === studentEmail.toLowerCase()) ||
-              (studentName && p.user && p.user.toLowerCase() === studentName.toLowerCase())
-            );
-          }
-        } catch (err) {
-          console.warn('Backend payment history fetch failed, using local storage:', err);
+        const adminId = getAdminUserId();
+        const res = await fetch(`${BASE_URL}/bsgupadmin/admindashboard/?user_id=${encodeURIComponent(adminId)}`, {
+          credentials: 'include'
+        });
+        const data = await res.json();
+        if (data.success && data.data && data.data.recent_payments) {
+          setPayments(data.data.recent_payments);
+        } else {
+          setPayments([]);
         }
-
-        // 3. Normalize and merge unique payments
-        const merged = [];
-        
-        // Add local ones first
-        localHistory.forEach(p => {
-          const cleanAmount = p.amount ? p.amount.replace(/[₹\s,]/g, '') : '0';
-          merged.push({
-            id: p.id,
-            date: p.date,
-            course: p.course,
-            amount: cleanAmount,
-            method: p.method || 'Razorpay',
-            status: p.status || 'Paid',
-            user: studentEmail || studentName || 'Student',
-            created_at: p.date
-          });
-        });
-
-        // Add backend ones if not duplicate
-        backendPayments.forEach(p => {
-          if (!merged.some(item => item.id === p.transaction_id)) {
-            const dateStr = p.created_at ? new Date(p.created_at).toLocaleDateString('en-IN') : 'Recent';
-            merged.push({
-              id: p.transaction_id,
-              date: dateStr,
-              course: p.course_name || (p.payment_for === 'course' ? 'Course Enrollment' : 'General Payment'),
-              amount: p.amount,
-              method: 'Razorpay',
-              status: 'Paid',
-              user: p.user,
-              created_at: p.created_at
-            });
-          }
-        });
-
-        setPayments(merged);
       } catch (err) {
-        console.error(err);
-        setError('Could not retrieve payment history');
+        console.error('Failed to load payment history:', err);
+        setError(err.message || 'Failed to load payments.');
       } finally {
         setLoading(false);
       }
     };
-
-    fetchPayments();
+    loadPayments();
   }, []);
 
   const handlePrintInvoice = (payment) => {
     const newWindow = window.open('', '_blank', 'width=800,height=900');
     if (!newWindow) {
-      alert('Please allow popups to view or download the invoice');
+      alert('Please allow popups to view or download the receipt');
       return;
     }
 
-    const transactionId = payment.id || 'N/A';
-    const dateStr = payment.date || 'Recent';
+    const transactionId = payment.transaction_id || 'N/A';
+    const rawDate = payment.created_at || new Date().toISOString();
+    const dateStr = new Date(rawDate).toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
     const amountVal = parseFloat(payment.amount || '0').toFixed(2);
     const userEmail = payment.user || 'Student';
-    const courseTitle = payment.course || 'Online Course Enrollment';
+    const courseTitle = payment.course_name || (payment.payment_for === 'course' ? 'Course Enrollment' : 'General Payment');
 
     newWindow.document.write(`
       <!doctype html>
       <html lang="en">
         <head>
           <meta charset="utf-8">
-          <title>Invoice - ${transactionId}</title>
+          <title>Receipt - ${transactionId}</title>
           <style>
             body {
               font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -123,14 +79,14 @@ const StudentPaymentHistory = () => {
               display: flex;
               justify-content: space-between;
               align-items: center;
-              border-bottom: 2px solid #10b981;
+              border-bottom: 2px solid #7c3aed;
               padding-bottom: 20px;
               margin-bottom: 30px;
             }
             .logo {
               font-size: 24px;
               font-weight: bold;
-              color: #10b981;
+              color: #7c3aed;
             }
             .invoice-title {
               font-size: 28px;
@@ -168,7 +124,7 @@ const StudentPaymentHistory = () => {
             .total-row td {
               font-weight: bold;
               font-size: 18px;
-              border-top: 2px solid #10b981;
+              border-top: 2px solid #7c3aed;
               padding-top: 15px;
             }
             .footer {
@@ -185,7 +141,7 @@ const StudentPaymentHistory = () => {
           <div class="invoice-box">
             <div class="header">
               <div class="logo">⚜️ THE BHARAT SCOUTS & GUIDES (UP)</div>
-              <div class="invoice-title">TAX INVOICE</div>
+              <div class="invoice-title">PAYMENT RECEIPT</div>
             </div>
             
             <table class="details-table">
@@ -195,7 +151,7 @@ const StudentPaymentHistory = () => {
                   ${userEmail}
                 </td>
                 <td style="text-align: right;">
-                  <strong>Invoice ID:</strong> ${transactionId}<br>
+                  <strong>Receipt ID:</strong> ${transactionId}<br>
                   <strong>Date:</strong> ${dateStr}<br>
                   <strong>Status:</strong> <span style="color: #10b981; font-weight: bold;">PAID</span>
                 </td>
@@ -222,7 +178,7 @@ const StudentPaymentHistory = () => {
             </table>
             
             <div class="footer">
-              Thank you for your payment. This is a computer-generated tax invoice and does not require a signature.<br>
+              Thank you for your payment. This is a computer-generated receipt and does not require a signature.<br>
               © The Bharat Scouts & Guides, Uttar Pradesh. All Rights Reserved.
             </div>
           </div>
@@ -238,16 +194,37 @@ const StudentPaymentHistory = () => {
     newWindow.document.close();
   };
 
+  const filteredPayments = payments.filter(payment => {
+    const term = searchTerm.toLowerCase();
+    return (
+      (payment.user && payment.user.toLowerCase().includes(term)) ||
+      (payment.transaction_id && payment.transaction_id.toLowerCase().includes(term)) ||
+      (payment.amount && payment.amount.toString().includes(term))
+    );
+  });
+
   return (
-    <div className="p-6 text-left">
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold text-slate-800">Payment History & Invoices</h2>
-        <p className="text-slate-500 mt-2">View your past transactions and download official tax invoices.</p>
+    <div className="p-4 md:p-6 text-left">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <div>
+          <h2 className="text-3xl font-bold text-slate-800 font-sans">Payment History</h2>
+          <p className="text-slate-500 mt-2 font-sans">Track and manage student enrollment payments.</p>
+        </div>
+        <div className="w-full sm:w-72 relative">
+          <input
+            type="text"
+            placeholder="Search payments..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed] focus:border-transparent transition-all"
+          />
+          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-lg">🔍</span>
+        </div>
       </div>
 
       {loading ? (
         <div className="flex justify-center p-10">
-          <p className="text-xl text-slate-500 font-medium animate-pulse">Loading transaction records...</p>
+          <p className="text-xl text-slate-500 font-medium animate-pulse">Loading payments...</p>
         </div>
       ) : error ? (
         <div className="bg-rose-50 border border-rose-200 text-rose-700 rounded-xl p-6 text-center font-semibold">
@@ -256,45 +233,45 @@ const StudentPaymentHistory = () => {
       ) : (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 text-sm">
                 <tr>
-                  <th className="py-4 px-6">Invoice ID</th>
+                  <th className="py-4 px-6">Student</th>
+                  <th className="py-4 px-6">Transaction ID</th>
                   <th className="py-4 px-6">Date</th>
-                  <th className="py-4 px-6">Course</th>
                   <th className="py-4 px-6">Amount</th>
-                  <th className="py-4 px-6">Method</th>
-                  <th className="py-4 px-6">Status</th>
-                  <th className="py-4 px-6">Invoice</th>
+                  <th className="py-4 px-6">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-sm">
-                {payments.map((payment, index) => (
-                  <tr key={payment.id || index} className="hover:bg-slate-50 transition-colors">
-                    <td className="py-4 px-6 font-mono text-xs text-slate-800">{payment.id}</td>
-                    <td className="py-4 px-6 text-slate-600">{payment.date}</td>
-                    <td className="py-4 px-6 text-slate-800 font-medium">{payment.course}</td>
-                    <td className="py-4 px-6 font-bold text-slate-700">₹ {parseFloat(payment.amount || '0').toFixed(2)}</td>
-                    <td className="py-4 px-6 text-slate-500">{payment.method}</td>
+              <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
+                {filteredPayments.map((payment, index) => (
+                  <tr key={payment.transaction_id || index} className="hover:bg-slate-50 transition-colors">
                     <td className="py-4 px-6">
-                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
-                        {payment.status}
-                      </span>
+                      <div className="font-semibold text-slate-800">{payment.user}</div>
+                    </td>
+                    <td className="py-4 px-6 text-slate-600 font-mono text-xs">
+                      {payment.transaction_id}
+                    </td>
+                    <td className="py-4 px-6 text-slate-500">
+                      {payment.created_at ? new Date(payment.created_at).toLocaleDateString('en-IN') : '-'}
+                    </td>
+                    <td className="py-4 px-6 font-bold text-emerald-600">
+                      ₹ {parseFloat(payment.amount || '0').toFixed(2)}
                     </td>
                     <td className="py-4 px-6">
                       <button
                         onClick={() => handlePrintInvoice(payment)}
-                        className="bg-emerald-50 hover:bg-emerald-600 text-emerald-600 hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1"
+                        className="bg-violet-100 hover:bg-violet-600 text-violet-700 hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5"
                       >
-                        <span>⬇️</span> Invoice
+                        <span>📄</span> View / Print Receipt
                       </button>
                     </td>
                   </tr>
                 ))}
-                {payments.length === 0 && (
+                {filteredPayments.length === 0 && (
                   <tr>
-                    <td colSpan="7" className="p-10 text-center text-slate-500">
-                      No payment history found.
+                    <td colSpan="5" className="p-10 text-center text-slate-500">
+                      No payments found.
                     </td>
                   </tr>
                 )}
@@ -307,4 +284,4 @@ const StudentPaymentHistory = () => {
   );
 };
 
-export default StudentPaymentHistory;
+export default AdminPaymentHistory;

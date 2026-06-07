@@ -31,6 +31,8 @@ const StudentProfile = () => {
       
       if (profileData && profileData.id) {
         localStorage.setItem('profileId', profileData.id.toString());
+        localStorage.setItem('studentEmail', profileData.email || '');
+        localStorage.setItem('studentName', profileData.full_name || '');
         setProfile(profileData);
         setFormData({
           full_name: profileData.full_name || '',

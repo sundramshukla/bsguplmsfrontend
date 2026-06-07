@@ -621,7 +621,7 @@ const StudentEnrolledCourses = () => {
   };
 
   const handleNextPart = () => {
-    const activeParts = lessons.length > 0 ? lessons : fallbackParts;
+    const activeParts = lessons;
     
     // If viewing a sub-lesson and there are more sub-lessons left:
     if (activeSubLessonIndex !== null && activeSubLessonIndex >= 0) {
@@ -684,25 +684,44 @@ const StudentEnrolledCourses = () => {
 
   // If in Course Viewer/Study mode
   if (activeCourse) {
-    const fallbackParts = [
-      {
-        title: "Scout Oath and Scout Law",
-        description: "In this introductory lesson, you will learn the core foundations of the Scout & Guide movement. Master the Scout Sign, Scout Salute, and study the 9 essential clauses of the Scout Law that instill honesty, discipline, and loyalty.",
-        youtube_url: "https://www.youtube.com/watch?v=g_TfFfD4WvA" // BSG introductory video placeholder
-      },
-      {
-        title: "Essential Knots & Pioneering",
-        description: "Pioneering is the art of building structures using timber spars and ropes. In this second phase, practice the primary knots crucial for survival and encampment, including the Reef Knot, Clove Hitch, and Bowline.",
-        youtube_url: "https://www.youtube.com/watch?v=zFp-61d0y60"
-      },
-      {
-        title: "First Aid & Survival Skills",
-        description: "In the final lesson of this course, you will learn life-saving emergency medical techniques. Gain practical knowledge in dressing wounds, treating burns, making improvised stretchers, and managing fractured limbs.",
-        youtube_url: "https://www.youtube.com/watch?v=G6jWcZlye-0"
-      }
-    ];
+    if (lessonsLoading) {
+      return (
+        <div className="p-6 text-center max-w-xl mx-auto min-h-[50vh] flex items-center justify-center">
+          <Loader message="Loading course lessons..." />
+        </div>
+      );
+    }
 
-    const activeParts = lessons.length > 0 ? lessons : fallbackParts;
+    if (lessons.length === 0) {
+      return (
+        <div className="p-4 md:p-8 max-w-2xl mx-auto text-left">
+          <button 
+            onClick={resetStudyPanel} 
+            className="mb-6 flex items-center gap-2 text-[#7c3aed] hover:text-[#6d28d9] font-bold transition-colors"
+          >
+            <span>🔙</span> Back to Enrolled Courses
+          </button>
+
+          <h2 className="text-3xl font-extrabold text-slate-800 mb-6 font-sans">{activeCourse.title}</h2>
+          
+          <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center shadow-sm">
+            <div className="text-5xl mb-4">📖</div>
+            <h3 className="text-xl font-bold text-slate-800 mb-2 font-sans">No Lessons Available</h3>
+            <p className="text-slate-500 mb-6 font-sans">
+              The administrator has not added any lessons or syllabus material to this course yet. Please check back later.
+            </p>
+            <button 
+              onClick={resetStudyPanel} 
+              className="bg-[#7c3aed] hover:bg-[#6d28d9] text-white px-6 py-2.5 rounded-xl font-semibold transition-colors"
+            >
+              Back to Dashboard
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    const activeParts = lessons;
     const currentLesson = activeParts[currentPart - 1];
     
     // Get active content information
@@ -891,13 +910,30 @@ const StudentEnrolledCourses = () => {
                   <span>{maxUnlockedPart >= activeParts.length + 1 ? '📝' : '🔒'}</span>
                 </button>
 
-                {currentPart === activeParts.length + 1 && (
+              {currentPart === activeParts.length + 1 && (() => {
+                const userId = localStorage.getItem('userId') || 'guest';
+                const certKey = `earnedCertificates_${userId}`;
+                const certList = JSON.parse(localStorage.getItem(certKey) || '[]');
+                const isCertEarned = certList.some(id => id.toString() === activeCourse.id.toString());
+                
+                return (
                   <div className="p-6 bg-white border-t border-slate-100">
                     <div className="space-y-6">
                       <h3 className="text-2xl font-bold text-slate-800">Final Course Examination</h3>
-                      <p className="text-slate-500">You must pass this quiz to graduate from the course and obtain your official Scout and Guide certificate.</p>
                       
-                      {!quizStarted ? (
+                      {isCertEarned ? (
+                        <div className="py-8 text-center space-y-4">
+                          <div className="text-6xl">🏆</div>
+                          <h4 className="text-xl font-bold text-slate-800">Certificate Already Generated!</h4>
+                          <p className="text-slate-500 max-w-md mx-auto">You have successfully completed this course and earned your official Scout & Guide certificate.</p>
+                          <button 
+                            onClick={() => setShowCertificate(true)}
+                            className="bg-[#10b981] hover:bg-[#059669] text-white font-extrabold px-10 py-3.5 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 mx-auto text-sm"
+                          >
+                            <span>🏆</span> View / Download Certificate
+                          </button>
+                        </div>
+                      ) : !quizStarted ? (
                         <div className="py-8 text-center space-y-4">
                           <div className="text-6xl">📝</div>
                           <h4 className="text-xl font-bold text-slate-800">Are you ready to start the quiz?</h4>
@@ -998,7 +1034,8 @@ const StudentEnrolledCourses = () => {
                       )}
                     </div>
                   </div>
-                )}
+                )
+              })()}
               </div>
             </div>
           </div>
