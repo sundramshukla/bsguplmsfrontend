@@ -386,13 +386,11 @@ const StudentEnrolledCourses = () => {
       const fetchCourseLessons = async () => {
         setLessonsLoading(true);
         try {
-          const res = await fetch(`${BASE_URL}/bsgupadmin/create-lesson/?course_id=${activeCourse.id}`);
+          const userId = localStorage.getItem('userId') || 'guest';
+          const res = await fetch(`${BASE_URL}/user/course-lesson?user_id=${userId}&course_id=${activeCourse.id}`);
           const data = await res.json();
-          if (data.success && data.data && data.data.length > 0) {
-            setLessons(data.data);
-          } else {
-            setLessons([]);
-          }
+          const lessonList = data.data || (Array.isArray(data) ? data : []);
+          setLessons(lessonList);
         } catch (err) {
           console.error("Error loading lessons:", err);
           setLessons([]);
@@ -407,11 +405,35 @@ const StudentEnrolledCourses = () => {
   useEffect(() => {
     if (activeCourse) {
       const userId = localStorage.getItem('userId') || 'guest';
-      const key = `unlockedPart_${userId}_${activeCourse.id}`;
-      const savedProgress = parseInt(localStorage.getItem(key) || '1', 10);
-      setMaxUnlockedPart(savedProgress);
-      setCurrentPart(savedProgress);
-      setExpandedLessons({ [savedProgress]: true });
+      
+      const fetchProgress = async () => {
+        try {
+          const res = await fetch(`${BASE_URL}/user/course-progress?user_id=${userId}&course_id=${activeCourse.id}`);
+          const data = await res.json();
+          let unlocked = 1;
+          if (data.success && data.data) {
+            const completedCount = data.data.completed_lessons_count ?? data.data.completed_count ?? data.data.progress ?? 0;
+            unlocked = completedCount + 1;
+          } else if (data.progress !== undefined) {
+            unlocked = data.progress + 1;
+          } else if (data.completed_lessons_count !== undefined) {
+            unlocked = data.completed_lessons_count + 1;
+          }
+          
+          setMaxUnlockedPart(unlocked);
+          setCurrentPart(unlocked);
+          setExpandedLessons({ [unlocked]: true });
+        } catch (err) {
+          console.error("Error loading progress:", err);
+          const key = `unlockedPart_${userId}_${activeCourse.id}`;
+          const savedProgress = parseInt(localStorage.getItem(key) || '1', 10);
+          setMaxUnlockedPart(savedProgress);
+          setCurrentPart(savedProgress);
+          setExpandedLessons({ [savedProgress]: true });
+        }
+      };
+
+      fetchProgress();
       setActiveSubLessonIndex(-1);
       setViewMode('video');
       setQuizStarted(false);
@@ -580,6 +602,24 @@ const StudentEnrolledCourses = () => {
     }
   };
 
+  const markLessonComplete = async (lessonId) => {
+    const userId = localStorage.getItem('userId');
+    if (!userId || !lessonId) return;
+
+    try {
+      await fetch(`${BASE_URL}/user/mark-lesson-complete/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: parseInt(userId, 10),
+          lesson_id: parseInt(lessonId, 10)
+        })
+      });
+    } catch (err) {
+      console.error("Failed to mark lesson complete on server:", err);
+    }
+  };
+
   const handleNextPart = () => {
     const activeParts = lessons.length > 0 ? lessons : fallbackParts;
     
@@ -596,6 +636,11 @@ const StudentEnrolledCourses = () => {
     
     // Otherwise, advance to the next main lesson
     if (currentPart < activeParts.length) {
+      const finishedLesson = activeParts[currentPart - 1];
+      if (finishedLesson && finishedLesson.id) {
+        markLessonComplete(finishedLesson.id);
+      }
+
       const nextPartNum = currentPart + 1;
       if (nextPartNum > maxUnlockedPart) {
         updateUnlockedProgress(nextPartNum);
@@ -610,6 +655,11 @@ const StudentEnrolledCourses = () => {
         [nextPartNum]: true
       }));
     } else {
+      const finishedLesson = activeParts[currentPart - 1];
+      if (finishedLesson && finishedLesson.id) {
+        markLessonComplete(finishedLesson.id);
+      }
+
       // Unlock quiz!
       const quizPartNum = activeParts.length + 1;
       if (quizPartNum > maxUnlockedPart) {

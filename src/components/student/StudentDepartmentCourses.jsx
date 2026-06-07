@@ -55,11 +55,29 @@ const StudentDepartmentCourses = ({ department, title }) => {
   }, [userId]);
 
   const runEnrollment = async (course) => {
+    console.log('=== runEnrollment START ===');
+    console.log('runEnrollment called with course:', {
+      course,
+      course_id: course?.id,
+      course_course_id: course?.course?.id,
+      course_full: JSON.stringify(course)
+    });
+
     setIsPaying(true);
+    const finalCourseId = course.id;
+    
+    console.log('Course ID resolution:', {
+      finalCourseId,
+    });
+    
     try {
+      console.log('Calling processCourseEnrollment with courseId:', finalCourseId, 'userId:', userId);
+      if (!finalCourseId) throw new Error('finalCourseId is null or undefined');
+      if (!userId) throw new Error('userId is null or undefined');
+      
       const result = await processCourseEnrollment({
         userId,
-        courseId: course.id,
+        courseId: finalCourseId,
         courseTitle: course.title,
         coursePrice: course.price
       });
@@ -79,6 +97,7 @@ const StudentDepartmentCourses = ({ department, title }) => {
       }
 
       await refreshEnrollments();
+      console.log('=== runEnrollment SUCCESS with courseId:', finalCourseId, '===');
       navigateToPaymentResult('success', {
         message: result.message,
         courseTitle: course.title,
@@ -86,7 +105,11 @@ const StudentDepartmentCourses = ({ department, title }) => {
         orderId: result.orderId
       });
     } catch (err) {
-      console.error(err);
+      console.error('=== runEnrollment FAILED with courseId:', finalCourseId, 'error:', err, '===');
+      const errMsg = `Payment error: ${err.message || 'Unknown error'}`;
+      console.error(errMsg);
+      // eslint-disable-next-line no-alert
+      alert(errMsg);
       navigateToPaymentResult('failed', {
         message: err.message || 'Payment failed. Please try again.',
         courseTitle: course.title,
@@ -119,7 +142,18 @@ const StudentDepartmentCourses = ({ department, title }) => {
 
   const executePayment = async () => {
     if (!activePaymentCourse) return;
-    await runEnrollment(activePaymentCourse);
+    console.log('ExecutePayment clicked for:', activePaymentCourse.id || activePaymentCourse.course?.id);
+    try {
+      // small visible feedback to ensure the click was registered
+      // eslint-disable-next-line no-alert
+      console.debug('Starting payment flow...');
+      await runEnrollment(activePaymentCourse);
+    } catch (err) {
+      console.error('executePayment error:', err);
+      // eslint-disable-next-line no-alert
+      alert('Payment flow error: ' + (err.message || 'See console'));
+      throw err;
+    }
   };
 
   return (
@@ -134,6 +168,11 @@ const StudentDepartmentCourses = ({ department, title }) => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {courses.map(course => {
+            console.log('StudentDepartmentCourses rendering course:', {
+              course_id: course.id,
+              course_title: course.title,
+              course_full: JSON.stringify(course)
+            });
             const isEnrolled = enrolledCourseIds.some((id) => id.toString() === course.id.toString());
             const isFree = course.price == 0 || course.price == '0' || course.price == '0.00';
 

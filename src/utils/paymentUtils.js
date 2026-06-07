@@ -21,12 +21,16 @@ const parseJsonResponse = async (res) => {
 
 const apiFetch = async (url, options = {}) => {
   try {
+    const mergedHeaders = {
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
+    };
+
+    console.log('apiFetch calling:', url, 'options=', { ...options, headers: mergedHeaders });
+
     return await fetch(url, {
       ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(options.headers || {})
-      }
+      headers: mergedHeaders
     });
   } catch (err) {
     if (err instanceof TypeError) {
@@ -34,6 +38,57 @@ const apiFetch = async (url, options = {}) => {
     }
     throw err;
   }
+};
+
+const normalizeId = (value) => {
+  if (value == null) return null;
+  if (typeof value === 'object') {
+    if (Object.prototype.hasOwnProperty.call(value, 'course')) {
+      return normalizeId(value.course);
+    }
+
+    const candidate = value.id ?? value.course_id ?? value.user_id ?? value.userId;
+    return normalizeId(candidate);
+  }
+  const parsed = parseInt(value, 10);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
+const normalizeCourseId = (courseId, userId = null) => {
+  // First try direct normalization
+  const base = normalizeId(courseId);
+  if (base) return base;
+
+  // Fallback: consult persisted enrollment->course mapping
+  try {
+    if (userId != null) {
+      const mapKey = `enrollmentCourseMap_${userId}`;
+      const map = JSON.parse(localStorage.getItem(mapKey) || '{}');
+      const enrollId = (courseId && (courseId.id ?? courseId.enrollment_id)) || courseId;
+      if (enrollId != null) {
+        const found = map[enrollId.toString()];
+        if (found) {
+          console.log('normalizeCourseId: Using mapping', { enrollId, mappedCourseId: found });
+          return parseInt(found, 10);
+        }
+      }
+    }
+  } catch (e) {
+    // ignore storage errors
+  }
+
+  return null;
+};
+
+
+const normalizeUserId = (userId) => normalizeId(userId);
+
+const extractCourseMeta = (course) => {
+  if (course == null || typeof course !== 'object') return { title: null, price: null };
+  return {
+    title: course.title ?? course.course?.title ?? course.name ?? null,
+    price: course.price ?? course.course?.price ?? course.amount ?? null
+  };
 };
 
 export const loadRazorpayScript = () => {
@@ -63,26 +118,67 @@ export const loadRazorpayScript = () => {
 };
 
 export const createPaymentOrder = async (userId, courseId) => {
-  const payload = {
-    payment_for: 'course',
-    course_id: parseInt(courseId, 10),
-    user_id: parseInt(userId, 10)
-  };
+  const normalizedUserId = normalizeUserId(userId);
+  const normalizedCourseId = normalizeCourseId(courseId, normalizedUserId);
 
-  const profileId = localStorage.getItem('profileId');
-  if (profileId) {
-    payload.profile_id = parseInt(profileId, 10);
-  }
-
-  const res = await apiFetch(`${BASE_URL}/payment/createpaymentorder/`, {
-    method: 'POST',
-    body: JSON.stringify(payload)
+  console.log('createPaymentOrder payload debug:', {
+    rawCourseId: courseId,
+    normalizedCourseId,
+    normalizedUserId
   });
 
-  const data = await parseJsonResponse(res);
+  if (!normalizedCourseId) {
+    throw new Error('Invalid course id for payment request.');
+  }
+  if (!normalizedUserId) {
+    throw new Error('Invalid user id for payment request.');
+  }
+
+  const payload = {
+    payment_for: 'course',
+    course_id: normalizedCourseId,
+    user_id: normalizedUserId
+  };
+
+  let attempts = 0;
+  const maxAttempts = 3;
+  let res;
+  let data;
+
+  while (attempts < maxAttempts) {
+    try {
+      res = await apiFetch(`${BASE_URL}/payment/createpaymentorder/`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      data = await parseJsonResponse(res);
+
+      if (res.ok && data.success !== false) {
+        return { data, ok: res.ok, status: res.status };
+      }
+
+      // If server returned "Course not found", retry after a short delay
+      if (data.message && data.message.toLowerCase().includes('course not found')) {
+        attempts++;
+        if (attempts < maxAttempts) {
+          console.warn(`createPaymentOrder: Course not found. Retrying attempt ${attempts}...`);
+          await new Promise(resolve => setTimeout(resolve, 800));
+          continue;
+        }
+      }
+
+      break;
+    } catch (err) {
+      attempts++;
+      if (attempts >= maxAttempts) {
+        throw err;
+      }
+      await new Promise(resolve => setTimeout(resolve, 800));
+    }
+  }
 
   if (!res.ok && data.success !== true) {
-    throw new Error(data.message || data.error || `Could not start payment (${res.status})`);
+    throw new Error(data.message || data.error || data.detail || `Could not start payment (${res.status})`);
   }
 
   return { data, ok: res.ok, status: res.status };
@@ -164,8 +260,8 @@ const openRazorpayCheckout = ({ order, courseTitle, userId, courseId }) =>
         try {
           const verifyData = await verifyPaymentOnServer({
             payment_for: 'course',
-            course_id: parseInt(courseId, 10),
-            user_id: parseInt(userId, 10),
+            course_id: normalizeCourseId(courseId, userId),
+            user_id: normalizeUserId(userId),
             payment_record_id: order.payment_record_id,
             razorpay_order_id: response.razorpay_order_id,
             razorpay_payment_id: response.razorpay_payment_id,
@@ -193,14 +289,69 @@ export const processCourseEnrollment = async ({ userId, courseId, courseTitle, c
     throw new Error('Please log in to enroll');
   }
 
-  const { data } = await createPaymentOrder(userId, courseId);
+  console.log('processCourseEnrollment called with:', {
+    userId,
+    courseId,
+    courseTitle,
+    coursePrice,
+    courseId_typeof: typeof courseId,
+    courseId_full: JSON.stringify(courseId)
+  });
+
+  const normalizedUserId = normalizeUserId(userId);
+  const normalizedCourseId = normalizeCourseId(courseId, normalizedUserId);
+  
+  console.log('Normalization result:', {
+    normalizedUserId,
+    normalizedCourseId,
+    originalCourseId: courseId
+  });
+  
+  if (!normalizedCourseId) {
+    const errMsg = 'Invalid course id for enrollment';
+    console.error(errMsg, { courseId, normalizedCourseId, courseId_typeof: typeof courseId });
+    throw new Error(errMsg);
+  }
+
+  console.log('After normalization:', {
+    normalizedCourseId
+  });
+
+  const courseMeta = extractCourseMeta(courseId);
+  const resolvedCourseTitle = courseTitle || courseMeta.title || 'Course';
+  const resolvedCoursePrice = coursePrice != null ? coursePrice : courseMeta.price;
+
+  let data;
+  try {
+    const resOrder = await createPaymentOrder(userId, normalizedCourseId);
+    data = resOrder.data;
+  } catch (err) {
+    const isFree = resolvedCoursePrice == 0 || resolvedCoursePrice == '0' || resolvedCoursePrice == '0.00';
+    if (isFree) {
+      console.warn('createPaymentOrder failed for free course, falling back to direct enrollment...', err);
+      try {
+        await enrollStudentInCourse(userId, normalizedCourseId);
+      } catch (enrollErr) {
+        console.error('Direct enrollment fallback failed:', enrollErr);
+        throw new Error(enrollErr.message || 'Enrollment failed');
+      }
+      window.dispatchEvent(new Event('enrollmentChange'));
+      return {
+        status: 'success',
+        type: 'free',
+        message: 'Successfully enrolled in free course'
+      };
+    }
+    throw err;
+  }
+
   const message = (data.message || '').toLowerCase();
 
   if (message.includes('already enrolled')) {
     try {
       const key = `enrolledCourses_${userId}`;
       const existing = JSON.parse(localStorage.getItem(key) || '[]');
-      const merged = [...new Set([...existing, parseInt(courseId, 10)])];
+      const merged = [...new Set([...existing, normalizeCourseId(courseId, userId)])];
       localStorage.setItem(key, JSON.stringify(merged));
       window.dispatchEvent(new Event('enrollmentChange'));
     } catch (e) {
@@ -234,13 +385,13 @@ export const processCourseEnrollment = async ({ userId, courseId, courseTitle, c
   await loadRazorpayScript();
   const paymentResult = await openRazorpayCheckout({
     order,
-    courseTitle,
+    courseTitle: resolvedCourseTitle,
     userId,
     courseId
   });
 
   try {
-    await enrollStudentInCourse(userId, courseId);
+    await enrollStudentInCourse(userId, normalizedCourseId);
   } catch (err) {
     console.error('Failed to enroll student after payment verification:', err);
   }
@@ -251,7 +402,7 @@ export const processCourseEnrollment = async ({ userId, courseId, courseTitle, c
     status: 'success',
     type: 'paid',
     message: paymentResult.verifyData?.message || 'Payment successful! You are now enrolled.',
-    amount: order.amount_in_rupees ?? coursePrice,
+    amount: order.amount_in_rupees ?? resolvedCoursePrice,
     orderId: order.order_id
   };
 };

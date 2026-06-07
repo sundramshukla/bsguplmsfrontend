@@ -105,6 +105,36 @@ export const fetchUserEnrollments = async (userId) => {
   }
 
   const data = await res.json();
+
+  // Persist a mapping of enrollment-row-id -> nested course id so UI wrapper ids
+  // can be resolved to the real course id later when triggering payment requests.
+  try {
+    const rows = data.data || data.enrollments || data.results || (Array.isArray(data) ? data : []);
+    if (Array.isArray(rows) && rows.length) {
+      const mapKey = `enrollmentCourseMap_${userId}`;
+      let map = {};
+      try {
+        map = JSON.parse(localStorage.getItem(mapKey) || '{}');
+      } catch (e) {
+        map = {};
+      }
+      rows.forEach((row) => {
+        const enrollId = row.id ?? row.enrollment_id ?? null;
+        const courseId = row.course?.id ?? row.course_id ?? row.course ?? null;
+        if (enrollId != null && courseId != null) {
+          map[enrollId.toString()] = parseInt(courseId, 10);
+        }
+      });
+      try {
+        localStorage.setItem(mapKey, JSON.stringify(map));
+      } catch (e) {
+        // ignore storage errors
+      }
+    }
+  } catch (e) {
+    // ignore mapping errors
+  }
+
   const enrollments = parseEnrollments(data);
   persistEnrollmentQuizMappings(enrollments);
   syncLocalEnrolledCache(

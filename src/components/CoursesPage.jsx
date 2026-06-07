@@ -88,14 +88,27 @@ const CoursesPage = () => {
   };
 
   const handleLoggedInEnroll = async (course) => {
+    console.log('handleLoggedInEnroll called with course:', {
+      course,
+      course_id: course?.id,
+      course_course_id: course?.course?.id,
+      course_full: JSON.stringify(course)
+    });
+
     const userId = localStorage.getItem('userId');
     if (!userId) {
       alert('Please sign up or log in to enroll in this course!');
       return;
     }
 
+    const finalCourseId = course.id;
+    
+    console.log('Course ID resolution:', {
+      finalCourseId,
+    });
+    
     try {
-      const alreadyEnrolled = await isUserEnrolledInCourse(userId, course.id);
+      const alreadyEnrolled = await isUserEnrolledInCourse(userId, finalCourseId);
       if (alreadyEnrolled) {
         alert('You are already enrolled in this course!');
         window.location.hash = '#student';
@@ -105,11 +118,12 @@ const CoursesPage = () => {
       console.warn('Could not verify enrollment status:', err);
     }
 
-    setEnrollingCourseId(course.id);
+    setEnrollingCourseId(finalCourseId);
     try {
+      console.log('Calling processCourseEnrollment with resolved courseId:', finalCourseId, 'userId:', userId);
       const result = await processCourseEnrollment({
         userId,
-        courseId: course.id,
+        courseId: finalCourseId,
         courseTitle: course.title,
         coursePrice: course.price
       });
@@ -185,7 +199,14 @@ const CoursesPage = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
-            {currentCards.map((course) => (
+            {currentCards.map((course) => {
+              console.log('CoursesPage rendering course:', {
+                course_id: course.id,
+                course_course_id: course.course?.id,
+                course_title: course.title,
+                course_full: JSON.stringify(course)
+              });
+              return (
               <div key={course.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-shadow border border-slate-100 flex flex-col">
                 <img 
                   src={course.image} 
@@ -242,7 +263,8 @@ const CoursesPage = () => {
                   )}
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
         )}
 

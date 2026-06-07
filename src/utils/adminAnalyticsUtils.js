@@ -65,7 +65,7 @@ export const fetchAdminDashboard = async (adminUserId = getAdminUserId()) => {
     throw new Error('Admin user id not found');
   }
 
-  const res = await fetch(`${BASE_URL}/bsgupadmin/dashboard/?user_id=${encodeURIComponent(adminUserId)}`, {
+  const res = await fetch(`${BASE_URL}/bsgupadmin/admindashboard/?user_id=${encodeURIComponent(adminUserId)}`, {
     credentials: 'include'
   });
 
@@ -77,8 +77,8 @@ export const fetchAdminDashboard = async (adminUserId = getAdminUserId()) => {
 
   const metrics = data.data || data;
   return {
-    registeredStudents: metrics.registered_students ?? 0,
-    enrolledStudents: metrics.enrolled_students ?? 0,
+    registeredStudents: metrics.registered_students ?? metrics.total_students ?? 0,
+    enrolledStudents: metrics.enrolled_students ?? metrics.total_enrollments ?? 0,
     totalCourses: metrics.total_courses ?? 0,
     totalLessons: metrics.total_lessons ?? 0,
     completionRate: metrics.completion_rate ?? 0,
