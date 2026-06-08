@@ -10,7 +10,7 @@ import {
   formatRevenue
 } from '../../utils/adminAnalyticsUtils';
 
-const AdminAnalytics = () => {
+const AdminAnalytics = ({ onNavigate }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [coursesCount, setCoursesCount] = useState(0);
@@ -121,7 +121,10 @@ const AdminAnalytics = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8 text-left">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-4 hover:shadow-md transition-shadow">
+        <div 
+          onClick={() => onNavigate && onNavigate('registered_students')}
+          className="cursor-pointer bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-4 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all"
+        >
           <div className="w-14 h-14 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center text-2xl">
             👥
           </div>
@@ -131,7 +134,10 @@ const AdminAnalytics = () => {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-4 hover:shadow-md transition-shadow">
+        <div 
+          onClick={() => onNavigate && onNavigate('enrolled_students')}
+          className="cursor-pointer bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-4 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all"
+        >
           <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center text-2xl">
             🎓
           </div>
@@ -141,7 +147,10 @@ const AdminAnalytics = () => {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-4 hover:shadow-md transition-shadow">
+        <div 
+          onClick={() => onNavigate && onNavigate('courses')}
+          className="cursor-pointer bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-4 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all"
+        >
           <div className="w-14 h-14 bg-violet-100 text-violet-600 rounded-xl flex items-center justify-center text-2xl">
             📚
           </div>
@@ -151,7 +160,10 @@ const AdminAnalytics = () => {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-4 hover:shadow-md transition-shadow">
+        <div 
+          onClick={() => onNavigate && onNavigate('lessons')}
+          className="cursor-pointer bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-4 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all"
+        >
           <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center text-2xl">
             🎥
           </div>
@@ -161,7 +173,10 @@ const AdminAnalytics = () => {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-4 hover:shadow-md transition-shadow">
+        <div 
+          onClick={() => onNavigate && onNavigate('enrolled_students')}
+          className="cursor-pointer bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-4 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all"
+        >
           <div className="w-14 h-14 bg-pink-100 text-pink-600 rounded-xl flex items-center justify-center text-2xl">
             📈
           </div>
@@ -171,7 +186,10 @@ const AdminAnalytics = () => {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-4 hover:shadow-md transition-shadow">
+        <div 
+          onClick={() => onNavigate && onNavigate('payment_history')}
+          className="cursor-pointer bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center space-x-4 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all"
+        >
           <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center text-2xl">
             💰
           </div>

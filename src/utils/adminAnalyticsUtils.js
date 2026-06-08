@@ -89,6 +89,24 @@ export const fetchAdminDashboard = async (adminUserId = getAdminUserId()) => {
   }
 
   const metrics = data.data || data;
+
+  // Parse department wise enrollment (handles both array and object responses)
+  const deptWise = metrics.department_wise_enrollment || metrics.department_enrollments || metrics.enrollments_by_department || null;
+  const parsedDept = { training: 0, organisation: 0, organization: 0, it: 0 };
+  if (Array.isArray(deptWise)) {
+    deptWise.forEach(item => {
+      const deptName = item.course__department || item.department || '';
+      const count = item.total_enrollments ?? item.count ?? 0;
+      if (deptName) {
+        parsedDept[deptName.toLowerCase()] = count;
+      }
+    });
+  } else if (typeof deptWise === 'object' && deptWise !== null) {
+    Object.keys(deptWise).forEach(key => {
+      parsedDept[key.toLowerCase()] = deptWise[key];
+    });
+  }
+
   return {
     registeredStudents: metrics.registered_students ?? metrics.total_students ?? 0,
     enrolledStudents: metrics.enrolled_students ?? metrics.total_enrollments ?? 0,
@@ -97,7 +115,7 @@ export const fetchAdminDashboard = async (adminUserId = getAdminUserId()) => {
     completionRate: metrics.completion_rate ?? 0,
     totalRevenue: metrics.total_revenue ?? 0,
     recentEnrollments: parseEnrollmentRecords(metrics.recent_enrollments || metrics.recent || []),
-    departmentEnrollments: metrics.enrollments_by_department || metrics.department_enrollments || null,
+    departmentEnrollments: parsedDept,
     raw: metrics
   };
 };
