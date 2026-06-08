@@ -124,11 +124,12 @@ const AdminCourses = () => {
 
     fd.append('department', formData.department);
     const userId = localStorage.getItem('adminUserId') || localStorage.getItem('userId') || formData.user || '1';
-    fd.append('user_id', userId);
 
     if (isEditing) {
+      fd.append('user_id', userId);
       fd.append('course_id', editingCourse.id);
     } else {
+      fd.append('user', userId);
       fd.append('is_active', 'true');
     }
 
