@@ -124,7 +124,7 @@ const AdminCourses = () => {
 
     fd.append('department', formData.department);
     const userId = localStorage.getItem('adminUserId') || localStorage.getItem('userId') || formData.user || '1';
-    fd.append('user', userId);
+    fd.append('user_id', userId);
 
     if (isEditing) {
       fd.append('course_id', editingCourse.id);
@@ -158,7 +158,8 @@ const AdminCourses = () => {
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this course?")) return;
     try {
-      const res = await fetch(`${BASE_URL}/bsgupadmin/createcourse/?course_id=${id}`, {
+      const adminUserId = localStorage.getItem('adminUserId') || localStorage.getItem('userId') || '32';
+      const res = await fetch(`${BASE_URL}/bsgupadmin/createcourse/?course_id=${id}&user_id=${adminUserId}`, {
         method: 'DELETE'
       });
       const data = await res.json();
