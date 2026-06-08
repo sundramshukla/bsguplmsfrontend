@@ -32,7 +32,6 @@ const EnrollWithoutLoginModal = ({ isOpen, onClose, courseId }) => {
       const res = await fetch(`${BASE_URL}/user/enrollwithoutlogin/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(payload)
       });
       if (res.ok) {
@@ -63,7 +62,6 @@ const EnrollWithoutLoginModal = ({ isOpen, onClose, courseId }) => {
       const res = await fetch(`${BASE_URL}/user/enrollwithoutlogin/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(payload)
       });
       if (res.ok) {

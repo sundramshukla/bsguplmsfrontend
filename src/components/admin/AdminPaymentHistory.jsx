@@ -14,9 +14,7 @@ const AdminPaymentHistory = () => {
       setError('');
       try {
         const adminId = getAdminUserId();
-        const res = await fetch(`${BASE_URL}/bsgupadmin/admindashboard/?user_id=${encodeURIComponent(adminId)}`, {
-          credentials: 'include'
-        });
+        const res = await fetch(`${BASE_URL}/bsgupadmin/admindashboard/?user_id=${encodeURIComponent(adminId)}`);
         const data = await res.json();
         if (data.success && data.data && data.data.recent_payments) {
           setPayments(data.data.recent_payments);

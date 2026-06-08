@@ -22,9 +22,7 @@ const StudentPaymentHistory = () => {
         // 2. Fetch backend payments
         let backendPayments = [];
         try {
-          const res = await fetch(`${BASE_URL}/bsgupadmin/admindashboard/?user_id=1`, {
-            credentials: 'include'
-          });
+          const res = await fetch(`${BASE_URL}/bsgupadmin/admindashboard/?user_id=1`);
           const data = await res.json();
           if (data.success && data.data && data.data.recent_payments) {
             // Filter by student email or name

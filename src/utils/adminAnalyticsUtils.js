@@ -27,7 +27,7 @@ export const parseEnrollmentRecords = (data) => {
 
   if (!Array.isArray(rows)) return [];
 
-  return rows.map((row) => {
+  return rows.map((row, idx) => {
     const userId = row.user_id ?? row.user?.id ?? row.user ?? row.profile_id ?? row.profile?.id;
     const courseId = row.course_id ?? row.course?.id ?? row.course;
     const studentName =
@@ -48,7 +48,7 @@ export const parseEnrollmentRecords = (data) => {
     const date = rawDate ? String(rawDate).split('T')[0] : '-';
 
     return {
-      id: row.id ?? row.enrollment_id ?? `${userId}_${courseId}`,
+      id: row.id ?? row.enrollment_id ?? (userId != null && courseId != null ? `${userId}_${courseId}` : `enrollment_${idx}_${Date.now()}`),
       userId,
       courseId,
       name: studentName,
@@ -65,9 +65,7 @@ export const fetchAdminDashboard = async (adminUserId = getAdminUserId()) => {
     throw new Error('Admin user id not found');
   }
 
-  const res = await fetch(`${BASE_URL}/bsgupadmin/admindashboard/?user_id=${encodeURIComponent(adminUserId)}`, {
-    credentials: 'include'
-  });
+  const res = await fetch(`${BASE_URL}/bsgupadmin/admindashboard/?user_id=${encodeURIComponent(adminUserId)}`);
 
   const data = await res.json().catch(() => ({}));
 
@@ -97,7 +95,7 @@ export const fetchAdminEnrollmentRecords = async (adminUserId = getAdminUserId()
 
   for (const url of urls) {
     try {
-      const res = await fetch(url, { method: 'GET', credentials: 'include' });
+      const res = await fetch(url, { method: 'GET' });
       if (!res.ok) continue;
       const data = await res.json();
       const records = parseEnrollmentRecords(data);
