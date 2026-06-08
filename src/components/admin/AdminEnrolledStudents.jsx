@@ -33,6 +33,7 @@ const AdminEnrolledStudents = () => {
     const term = searchTerm.toLowerCase();
     return (
       (item.name && item.name.toLowerCase().includes(term)) ||
+      (item.email && item.email.toLowerCase().includes(term)) ||
       (item.course && item.course.toLowerCase().includes(term)) ||
       (item.date && item.date.toLowerCase().includes(term))
     );
@@ -71,7 +72,8 @@ const AdminEnrolledStudents = () => {
             <table className="w-full text-left border-collapse">
               <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 text-sm">
                 <tr>
-                  <th className="py-4 px-6">Student ID / Email</th>
+                  <th className="py-4 px-6">Student Name / ID</th>
+                  <th className="py-4 px-6">Email</th>
                   <th className="py-4 px-6">Course Enrolled</th>
                   <th className="py-4 px-6">Enrollment Date</th>
                   <th className="py-4 px-6">Status</th>
@@ -86,6 +88,7 @@ const AdminEnrolledStudents = () => {
                         <div className="text-xs text-slate-400">UID: {enrollment.userId}</div>
                       )}
                     </td>
+                    <td className="py-4 px-6 text-slate-600">{enrollment.email}</td>
                     <td className="py-4 px-6 text-slate-800 font-medium">{enrollment.course}</td>
                     <td className="py-4 px-6 text-slate-600">
                       {enrollment.date !== '-' ? enrollment.date : 'Recent'}
@@ -99,7 +102,7 @@ const AdminEnrolledStudents = () => {
                 ))}
                 {filteredEnrollments.length === 0 && (
                   <tr>
-                    <td colSpan="4" className="p-10 text-center text-slate-500">
+                    <td colSpan="5" className="p-10 text-center text-slate-500">
                       No enrolled students found.
                     </td>
                   </tr>

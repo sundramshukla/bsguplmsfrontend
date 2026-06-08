@@ -136,7 +136,8 @@ const AdminLessons = () => {
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this lesson?")) return;
     try {
-      const res = await fetch(`${BASE_URL}/bsgupadmin/create-lesson/?lesson_id=${id}`, {
+      const adminUserId = localStorage.getItem('adminUserId') || localStorage.getItem('userId') || '1';
+      const res = await fetch(`${BASE_URL}/bsgupadmin/create-lesson/?lesson_id=${id}&user_id=${encodeURIComponent(adminUserId)}`, {
         method: 'DELETE'
       });
       const data = await res.json();

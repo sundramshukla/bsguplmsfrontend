@@ -46,12 +46,14 @@ export const parseEnrollmentRecords = (data) => {
 
     const rawDate = row.enrolled_at || row.enrollment_date || row.created_at || row.date;
     const date = rawDate ? String(rawDate).split('T')[0] : '-';
+    const email = row.email || row.user_name || row.user?.email || '-';
 
     return {
       id: row.id ?? row.enrollment_id ?? (userId != null && courseId != null ? `${userId}_${courseId}` : `enrollment_${idx}_${Date.now()}`),
       userId,
       courseId,
       name: studentName,
+      email,
       course: courseName,
       date,
       status: row.status || 'Active',

@@ -341,7 +341,8 @@ const AdminQuizzes = () => {
     if (!window.confirm("Are you sure you want to delete this entire quiz?")) return;
     setIsLoading(true);
     try {
-      const res = await fetch(`${BASE_URL}/bsgupadmin/create-quiz/?quiz_id=${quizId}`, {
+      const adminUserId = localStorage.getItem('adminUserId') || localStorage.getItem('userId') || 2;
+      const res = await fetch(`${BASE_URL}/bsgupadmin/create-quiz/?quiz_id=${quizId}&user_id=${encodeURIComponent(adminUserId)}`, {
         method: 'DELETE'
       });
       const data = await res.json();
@@ -366,7 +367,8 @@ const AdminQuizzes = () => {
     if (!window.confirm("Are you sure you want to delete this question?")) return;
     setIsLoading(true);
     try {
-      const res = await fetch(`${BASE_URL}/bsgupadmin/create-question/?question_id=${questionId}`, {
+      const adminUserId = localStorage.getItem('adminUserId') || localStorage.getItem('userId') || 2;
+      const res = await fetch(`${BASE_URL}/bsgupadmin/create-question/?question_id=${questionId}&user_id=${encodeURIComponent(adminUserId)}`, {
         method: 'DELETE'
       });
       const data = await res.json();
