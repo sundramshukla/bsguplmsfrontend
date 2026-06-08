@@ -26,7 +26,7 @@ const StudentPaymentHistory = () => {
           const data = await res.json();
           if (data.success && data.data && data.data.recent_payments) {
             // Filter by student email or name
-            backendPayments = data.data.recent_payments.filter(p => 
+            backendPayments = data.data.recent_payments.filter(p =>
               (studentEmail && p.user && p.user.toLowerCase() === studentEmail.toLowerCase()) ||
               (studentName && p.user && p.user.toLowerCase() === studentName.toLowerCase())
             );
@@ -37,7 +37,7 @@ const StudentPaymentHistory = () => {
 
         // 3. Normalize and merge unique payments
         const merged = [];
-        
+
         // Add local ones first
         localHistory.forEach(p => {
           const cleanAmount = p.amount ? p.amount.replace(/[₹\s,]/g, '') : '0';

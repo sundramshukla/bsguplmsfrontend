@@ -502,6 +502,31 @@ const Navbar = () => {
     window.location.hash = '#';
   };
 
+  useEffect(() => {
+    const checkActiveStatus = async () => {
+      const token = localStorage.getItem('token');
+      const userId = localStorage.getItem('userId');
+      const role = localStorage.getItem('role') || (localStorage.getItem('isAdminLoggedIn') ? 'admin' : 'student');
+      if (token && userId && role === 'student') {
+        try {
+          const res = await fetch(`${BASE_URL}/bsgupadmin/profile/?user_id=${userId}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          if (res.status === 401) {
+            handleLogout();
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+    };
+    checkActiveStatus();
+    const interval = setInterval(checkActiveStatus, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <>
       <header className="navbar relative">

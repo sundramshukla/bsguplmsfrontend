@@ -55,7 +55,7 @@ const AdminAnalytics = () => {
             ? dashboard.recentEnrollments
             : sortRecentEnrollments(enrollmentRecords);
 
-        setRecentEnrollments(recent);
+        setRecentEnrollments(recent.slice(0, 5));
 
         if (dashboard.departmentEnrollments) {
           setDepartmentStats([

@@ -4,14 +4,14 @@ import { BASE_URL } from '../../config';
 const AdminCourses = () => {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+
   const [showForm, setShowForm] = useState(false);
   const [editingCourse, setEditingCourse] = useState(null);
-  
+
   const [formData, setFormData] = useState({
-    title: '', description: '', 
+    title: '', description: '',
     priceAmount: '', priceCurrency: '₹', isFree: false,
-    durationValue: '', durationUnit: 'months', 
+    durationValue: '', durationUnit: 'months',
     durationHours: '', durationMinutes: '', durationSeconds: '',
     department: 'training', user: ''
   });
@@ -41,7 +41,7 @@ const AdminCourses = () => {
     setFormData({ ...formData, [e.target.name]: value });
   };
   const handleFileChange = (e) => {
-    if(e.target.files && e.target.files.length > 0) {
+    if (e.target.files && e.target.files.length > 0) {
       setFile(e.target.files[0]);
     }
   };
@@ -49,28 +49,28 @@ const AdminCourses = () => {
   const handleOpenForm = (course = null) => {
     if (course) {
       setEditingCourse(course);
-      
+
       let durVal = '';
       let durUnit = 'months';
       let dHours = '', dMins = '', dSecs = '';
       if (course.duration) {
-         if (course.duration.includes('hr') || course.duration.includes('min') || course.duration.includes('sec')) {
-            durUnit = 'time';
-            const hMatch = course.duration.match(/(\d+)\s*hr/);
-            const mMatch = course.duration.match(/(\d+)\s*min/);
-            const sMatch = course.duration.match(/(\d+)\s*sec/);
-            if (hMatch) dHours = hMatch[1];
-            if (mMatch) dMins = mMatch[1];
-            if (sMatch) dSecs = sMatch[1];
-         } else {
-            const parts = course.duration.split(' ');
-            if (parts.length >= 2) {
-                durVal = parts[0];
-                durUnit = parts.slice(1).join(' ').toLowerCase();
-            } else {
-                durVal = course.duration;
-            }
-         }
+        if (course.duration.includes('hr') || course.duration.includes('min') || course.duration.includes('sec')) {
+          durUnit = 'time';
+          const hMatch = course.duration.match(/(\d+)\s*hr/);
+          const mMatch = course.duration.match(/(\d+)\s*min/);
+          const sMatch = course.duration.match(/(\d+)\s*sec/);
+          if (hMatch) dHours = hMatch[1];
+          if (mMatch) dMins = mMatch[1];
+          if (sMatch) dSecs = sMatch[1];
+        } else {
+          const parts = course.duration.split(' ');
+          if (parts.length >= 2) {
+            durVal = parts[0];
+            durUnit = parts.slice(1).join(' ').toLowerCase();
+          } else {
+            durVal = course.duration;
+          }
+        }
       }
 
       setFormData({
@@ -84,8 +84,8 @@ const AdminCourses = () => {
         durationHours: dHours,
         durationMinutes: dMins,
         durationSeconds: dSecs,
-        department: course.department 
-          ? course.department.toLowerCase() 
+        department: course.department
+          ? course.department.toLowerCase()
           : 'training', // standardize to backend choices
         user: course.user || ''
       });
@@ -102,13 +102,13 @@ const AdminCourses = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const isEditing = !!editingCourse;
-    
+
     const fd = new FormData();
     fd.append('title', formData.title);
     fd.append('description', formData.description);
     fd.append('price', formData.isFree ? 0 : formData.priceAmount); // Assuming backend expects pure amount
     // If backend wanted currency, we'd do fd.append('currency', formData.priceCurrency);
-    
+
     let finalDuration = '';
     if (formData.durationUnit === 'time') {
       const parts = [];
@@ -121,17 +121,17 @@ const AdminCourses = () => {
       finalDuration = `${formData.durationValue} ${formData.durationUnit}`;
     }
     fd.append('duration', finalDuration);
-    
+
     fd.append('department', formData.department);
     const userId = localStorage.getItem('adminUserId') || localStorage.getItem('userId') || formData.user || '1';
-    fd.append('user_id', userId);
-    
+    fd.append('user', userId);
+
     if (isEditing) {
       fd.append('course_id', editingCourse.id);
     } else {
       fd.append('is_active', 'true');
     }
-    
+
     if (file) {
       fd.append('course_profile_pic', file);
     }
@@ -139,7 +139,7 @@ const AdminCourses = () => {
     try {
       const url = `${BASE_URL}/bsgupadmin/createcourse/`;
       const method = isEditing ? 'PUT' : 'POST';
-      
+
       const res = await fetch(url, { method, body: fd });
       const data = await res.json();
       if (data.success) {
@@ -158,8 +158,7 @@ const AdminCourses = () => {
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this course?")) return;
     try {
-      const userId = localStorage.getItem('adminUserId') || localStorage.getItem('userId') || '1';
-      const res = await fetch(`${BASE_URL}/bsgupadmin/createcourse/?course_id=${id}&user_id=${encodeURIComponent(userId)}`, {
+      const res = await fetch(`${BASE_URL}/bsgupadmin/createcourse/?course_id=${id}`, {
         method: 'DELETE'
       });
       const data = await res.json();
@@ -217,20 +216,20 @@ const AdminCourses = () => {
               <div className="flex gap-2">
                 {formData.durationUnit === 'time' ? (
                   <div className="flex w-3/4 gap-1">
-                     <div className="flex flex-col w-1/3">
-                        <input type="number" name="durationHours" placeholder="HH" value={formData.durationHours} onChange={handleChange} min="0" className="border border-slate-300 p-2.5 rounded focus:ring-2 focus:ring-[#7c3aed] focus:outline-none" />
-                        <span className="text-xs text-center text-slate-500 mt-1">Hours</span>
-                     </div>
-                     <span className="self-center font-bold">:</span>
-                     <div className="flex flex-col w-1/3">
-                        <input type="number" name="durationMinutes" placeholder="MM" value={formData.durationMinutes} onChange={handleChange} min="0" max="59" className="border border-slate-300 p-2.5 rounded focus:ring-2 focus:ring-[#7c3aed] focus:outline-none" />
-                        <span className="text-xs text-center text-slate-500 mt-1">Mins</span>
-                     </div>
-                     <span className="self-center font-bold">:</span>
-                     <div className="flex flex-col w-1/3">
-                        <input type="number" name="durationSeconds" placeholder="SS" value={formData.durationSeconds} onChange={handleChange} min="0" max="59" className="border border-slate-300 p-2.5 rounded focus:ring-2 focus:ring-[#7c3aed] focus:outline-none" />
-                        <span className="text-xs text-center text-slate-500 mt-1">Secs</span>
-                     </div>
+                    <div className="flex flex-col w-1/3">
+                      <input type="number" name="durationHours" placeholder="HH" value={formData.durationHours} onChange={handleChange} min="0" className="border border-slate-300 p-2.5 rounded focus:ring-2 focus:ring-[#7c3aed] focus:outline-none" />
+                      <span className="text-xs text-center text-slate-500 mt-1">Hours</span>
+                    </div>
+                    <span className="self-center font-bold">:</span>
+                    <div className="flex flex-col w-1/3">
+                      <input type="number" name="durationMinutes" placeholder="MM" value={formData.durationMinutes} onChange={handleChange} min="0" max="59" className="border border-slate-300 p-2.5 rounded focus:ring-2 focus:ring-[#7c3aed] focus:outline-none" />
+                      <span className="text-xs text-center text-slate-500 mt-1">Mins</span>
+                    </div>
+                    <span className="self-center font-bold">:</span>
+                    <div className="flex flex-col w-1/3">
+                      <input type="number" name="durationSeconds" placeholder="SS" value={formData.durationSeconds} onChange={handleChange} min="0" max="59" className="border border-slate-300 p-2.5 rounded focus:ring-2 focus:ring-[#7c3aed] focus:outline-none" />
+                      <span className="text-xs text-center text-slate-500 mt-1">Secs</span>
+                    </div>
                   </div>
                 ) : (
                   <input type="number" name="durationValue" placeholder="E.g. 3" value={formData.durationValue} onChange={handleChange} required min="1" className="w-[48%] border border-slate-300 p-2.5 rounded focus:ring-2 focus:ring-[#7c3aed] focus:outline-none" />

@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { BASE_URL } from '../../config';
-import { getAdminUserId, fetchAdminDashboard } from '../../utils/adminAnalyticsUtils';
+import { getAdminUserId, fetchAdminDashboard, fetchStudentActiveStatus, toggleStudentActiveStatus } from '../../utils/adminAnalyticsUtils';
 
 const AdminEnrolledStudents = () => {
   const [enrollments, setEnrollments] = useState([]);
+  const [studentStatuses, setStudentStatuses] = useState({});
+  const [statusLoading, setStatusLoading] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -15,10 +17,21 @@ const AdminEnrolledStudents = () => {
       try {
         const adminId = getAdminUserId();
         const dashboard = await fetchAdminDashboard(adminId);
-        
+
         // Use recent_enrollments from dashboard
         const list = dashboard.recentEnrollments || [];
         setEnrollments(list);
+
+        // Fetch statuses in parallel for unique userIds
+        const uniqueUserIds = [...new Set(list.map(item => item.userId).filter(Boolean))];
+        const statusMap = {};
+        await Promise.all(
+          uniqueUserIds.map(async (uid) => {
+            const status = await fetchStudentActiveStatus(uid);
+            statusMap[uid] = status;
+          })
+        );
+        setStudentStatuses(statusMap);
       } catch (err) {
         console.error('Failed to fetch enrolled students:', err);
         setError(err.message || 'Failed to load enrollment data.');
@@ -28,6 +41,25 @@ const AdminEnrolledStudents = () => {
     };
     loadData();
   }, []);
+
+  const handleToggleStatus = async (studentId) => {
+    if (statusLoading[studentId]) return;
+    
+    setStatusLoading(prev => ({ ...prev, [studentId]: true }));
+    try {
+      const res = await toggleStudentActiveStatus(studentId);
+      if (res.success) {
+        setStudentStatuses(prev => ({ ...prev, [studentId]: res.is_active }));
+      } else {
+        alert('Failed to update student status.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error updating student status.');
+    } finally {
+      setStatusLoading(prev => ({ ...prev, [studentId]: false }));
+    }
+  };
 
   const filteredEnrollments = enrollments.filter(item => {
     const term = searchTerm.toLowerCase();
@@ -49,7 +81,7 @@ const AdminEnrolledStudents = () => {
         <div className="w-full sm:w-72 relative">
           <input
             type="text"
-            placeholder="Search by student or course..."
+            placeholder="Search by student, email, or course..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#7c3aed] focus:border-transparent transition-all"
@@ -72,11 +104,10 @@ const AdminEnrolledStudents = () => {
             <table className="w-full text-left border-collapse">
               <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 text-sm">
                 <tr>
-                  <th className="py-4 px-6">Student Name / ID</th>
-                  <th className="py-4 px-6">Email</th>
+                  <th className="py-4 px-6">Student ID / Email</th>
                   <th className="py-4 px-6">Course Enrolled</th>
                   <th className="py-4 px-6">Enrollment Date</th>
-                  <th className="py-4 px-6">Status</th>
+                  <th className="py-4 px-6 text-center">Status / Toggle</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
@@ -84,25 +115,43 @@ const AdminEnrolledStudents = () => {
                   <tr key={enrollment.id || index} className="hover:bg-slate-50 transition-colors">
                     <td className="py-4 px-6">
                       <div className="font-semibold text-slate-800">{enrollment.name}</div>
+                      {enrollment.email && (
+                        <div className="text-xs text-slate-500">{enrollment.email}</div>
+                      )}
                       {enrollment.userId && (
                         <div className="text-xs text-slate-400">UID: {enrollment.userId}</div>
                       )}
                     </td>
-                    <td className="py-4 px-6 text-slate-600">{enrollment.email}</td>
                     <td className="py-4 px-6 text-slate-800 font-medium">{enrollment.course}</td>
                     <td className="py-4 px-6 text-slate-600">
                       {enrollment.date !== '-' ? enrollment.date : 'Recent'}
                     </td>
                     <td className="py-4 px-6">
-                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
-                        {enrollment.status || 'Active'}
-                      </span>
+                      <div className="flex items-center justify-center gap-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          studentStatuses[enrollment.userId] !== false
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-rose-100 text-rose-700'
+                        }`}>
+                          {studentStatuses[enrollment.userId] !== false ? 'Active' : 'Inactive'}
+                        </span>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="sr-only peer"
+                            checked={studentStatuses[enrollment.userId] !== false}
+                            disabled={statusLoading[enrollment.userId]}
+                            onChange={() => handleToggleStatus(enrollment.userId)}
+                          />
+                          <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#7c3aed]"></div>
+                        </label>
+                      </div>
                     </td>
                   </tr>
                 ))}
                 {filteredEnrollments.length === 0 && (
                   <tr>
-                    <td colSpan="5" className="p-10 text-center text-slate-500">
+                    <td colSpan="4" className="p-10 text-center text-slate-500">
                       No enrolled students found.
                     </td>
                   </tr>

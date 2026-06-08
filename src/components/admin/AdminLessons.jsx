@@ -9,7 +9,7 @@ const AdminLessons = () => {
 
   const [showForm, setShowForm] = useState(false);
   const [editingLesson, setEditingLesson] = useState(null);
-  
+
   const [formData, setFormData] = useState({
     title: '', description: '', youtube_url: '', order: 1, sub_lessons: []
   });
@@ -98,7 +98,7 @@ const AdminLessons = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const isEditing = !!editingLesson;
-    
+
     const payload = {
       course: parseInt(selectedCourseId, 10),
       title: formData.title,
@@ -107,7 +107,7 @@ const AdminLessons = () => {
       order: parseInt(formData.order, 10),
       sub_lessons: formData.sub_lessons
     };
-    
+
     if (isEditing) {
       payload.id = editingLesson.id;
     }
@@ -136,8 +136,7 @@ const AdminLessons = () => {
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this lesson?")) return;
     try {
-      const adminUserId = localStorage.getItem('adminUserId') || localStorage.getItem('userId') || '1';
-      const res = await fetch(`${BASE_URL}/bsgupadmin/create-lesson/?lesson_id=${id}&user_id=${encodeURIComponent(adminUserId)}`, {
+      const res = await fetch(`${BASE_URL}/bsgupadmin/create-lesson/?lesson_id=${id}`, {
         method: 'DELETE'
       });
       const data = await res.json();
@@ -156,8 +155,8 @@ const AdminLessons = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 bg-white p-5 rounded-xl shadow-sm border border-slate-200">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
           <h2 className="text-xl font-bold text-slate-800 shrink-0">Target Course</h2>
-          <select 
-            value={selectedCourseId} 
+          <select
+            value={selectedCourseId}
             onChange={(e) => setSelectedCourseId(e.target.value)}
             className="border-2 border-slate-200 rounded-lg p-2.5 w-full sm:min-w-[250px] font-medium text-slate-700 focus:border-[#7c3aed] focus:outline-none"
           >
@@ -227,7 +226,7 @@ const AdminLessons = () => {
               ))}
               {lessons.length === 0 && (
                 <tr>
-                   <td colSpan="4" className="p-10 text-center text-slate-500 text-lg">No lessons found for this course.</td>
+                  <td colSpan="4" className="p-10 text-center text-slate-500 text-lg">No lessons found for this course.</td>
                 </tr>
               )}
             </tbody>

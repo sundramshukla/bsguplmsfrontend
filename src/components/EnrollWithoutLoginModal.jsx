@@ -67,7 +67,7 @@ const EnrollWithoutLoginModal = ({ isOpen, onClose, courseId }) => {
       if (res.ok) {
         const data = await res.json().catch(() => ({}));
         alert('Successfully enrolled!');
-        
+
         const userId = data.user_id || data.id || localStorage.getItem('userId') || '3';
         localStorage.setItem('isLoggedIn', 'true');
         localStorage.setItem('role', 'student');
@@ -118,7 +118,7 @@ const EnrollWithoutLoginModal = ({ isOpen, onClose, courseId }) => {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={handleClose}>
       <div className="bg-white p-8 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
         <h3 className="text-2xl font-bold text-slate-900 mb-4">Enroll in Course</h3>
-        
+
         {step === 1 && (
           <form onSubmit={handleInitialSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -180,7 +180,7 @@ const EnrollWithoutLoginModal = ({ isOpen, onClose, courseId }) => {
             </button>
           </form>
         )}
-        
+
         <button onClick={handleClose} className="mt-4 w-full text-slate-500 hover:text-slate-700 text-sm py-2">Cancel</button>
       </div>
     </div>

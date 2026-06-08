@@ -15,6 +15,20 @@ export const normalizeDepartment = (dept = '') => {
   return DEPARTMENT_LABELS[key] || 'Organization';
 };
 
+export const formatDateDDMMYYYY = (rawDate) => {
+  if (!rawDate) return '-';
+  try {
+    const dStr = String(rawDate).split('T')[0];
+    const parts = dStr.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    return dStr;
+  } catch (e) {
+    return '-';
+  }
+};
+
 export const parseEnrollmentRecords = (data) => {
   if (!data) return [];
 
@@ -27,7 +41,7 @@ export const parseEnrollmentRecords = (data) => {
 
   if (!Array.isArray(rows)) return [];
 
-  return rows.map((row, idx) => {
+  return rows.map((row) => {
     const userId = row.user_id ?? row.user?.id ?? row.user ?? row.profile_id ?? row.profile?.id;
     const courseId = row.course_id ?? row.course?.id ?? row.course;
     const studentName =
@@ -45,15 +59,14 @@ export const parseEnrollmentRecords = (data) => {
       (courseId != null ? `Course #${courseId}` : 'Course');
 
     const rawDate = row.enrolled_at || row.enrollment_date || row.created_at || row.date;
-    const date = rawDate ? String(rawDate).split('T')[0] : '-';
-    const email = row.email || row.user_name || row.user?.email || '-';
+    const date = formatDateDDMMYYYY(rawDate);
 
     return {
-      id: row.id ?? row.enrollment_id ?? (userId != null && courseId != null ? `${userId}_${courseId}` : `enrollment_${idx}_${Date.now()}`),
+      id: row.id ?? row.enrollment_id ?? `${userId}_${courseId}`,
       userId,
       courseId,
       name: studentName,
-      email,
+      email: row.email || row.user?.email || null,
       course: courseName,
       date,
       status: row.status || 'Active',
@@ -160,4 +173,52 @@ export const formatCompletionRate = (value) => {
 export const formatRevenue = (value) => {
   const numeric = Number(value) || 0;
   return `₹ ${numeric.toFixed(2)}`;
+};
+
+export const fetchStudentActiveStatus = async (studentId) => {
+  try {
+    const adminUserId = getAdminUserId();
+    if (!adminUserId || !studentId) return true;
+
+    // Toggle 1: Change to new status
+    const res1 = await fetch(`${BASE_URL}/bsgupadmin/student-status-change/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: Number(adminUserId), student_id: Number(studentId) })
+    });
+    if (!res1.ok) return true;
+    const data1 = await res1.json();
+    const newState = data1.is_active_student;
+
+    // Toggle 2: Revert to original status
+    await fetch(`${BASE_URL}/bsgupadmin/student-status-change/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: Number(adminUserId), student_id: Number(studentId) })
+    });
+
+    return !newState;
+  } catch (e) {
+    console.error('Error fetching student active status:', e);
+    return true;
+  }
+};
+
+export const toggleStudentActiveStatus = async (studentId) => {
+  try {
+    const adminUserId = getAdminUserId();
+    if (!adminUserId || !studentId) return { success: false };
+
+    const res = await fetch(`${BASE_URL}/bsgupadmin/student-status-change/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: Number(adminUserId), student_id: Number(studentId) })
+    });
+    if (!res.ok) return { success: false };
+    const data = await res.json();
+    return { success: true, is_active: data.is_active_student };
+  } catch (e) {
+    console.error('Error toggling student active status:', e);
+    return { success: false };
+  }
 };
