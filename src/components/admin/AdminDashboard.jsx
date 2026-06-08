@@ -79,6 +79,12 @@ const AdminDashboard = ({ onLogout }) => {
             <span>📚</span> Manage Courses
           </button>
           <button 
+            onClick={() => handleTabClick('lessons')}
+             className={`w-full text-left px-5 py-4 rounded-xl font-semibold transition-all duration-200 flex items-center gap-3 ${activeTab === 'lessons' ? 'bg-[#7c3aed] text-white shadow-lg shadow-violet-500/30 translate-x-1' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+          >
+            <span>🎥</span> Manage Lessons
+          </button>
+          <button 
             onClick={() => handleTabClick('enrolled_students')}
             className={`w-full text-left px-5 py-4 rounded-xl font-semibold transition-all duration-200 flex items-center gap-3 ${activeTab === 'enrolled_students' ? 'bg-[#7c3aed] text-white shadow-lg shadow-violet-500/30 translate-x-1' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
           >
@@ -95,12 +101,6 @@ const AdminDashboard = ({ onLogout }) => {
             className={`w-full text-left px-5 py-4 rounded-xl font-semibold transition-all duration-200 flex items-center gap-3 ${activeTab === 'payment_history' ? 'bg-[#7c3aed] text-white shadow-lg shadow-violet-500/30 translate-x-1' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
           >
             <span>💰</span> Payment History
-          </button>
-          <button 
-            onClick={() => handleTabClick('lessons')}
-             className={`w-full text-left px-5 py-4 rounded-xl font-semibold transition-all duration-200 flex items-center gap-3 ${activeTab === 'lessons' ? 'bg-[#7c3aed] text-white shadow-lg shadow-violet-500/30 translate-x-1' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
-          >
-            <span>🎥</span> Manage Lessons
           </button>
           <button 
             onClick={() => handleTabClick('quizzes')}
