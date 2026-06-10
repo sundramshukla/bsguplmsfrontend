@@ -2,10 +2,37 @@ import React, { useState, useEffect } from "react";
 import "../CSS/style.css";
 import { BASE_URL } from '../config';
 
+const parseJwt = (token) => {
+  try {
+    if (!token) return null;
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error("Failed to parse JWT:", e);
+    return null;
+  }
+};
+
 const Navbar = () => {
   const [toast, setToast] = useState(null);
-  const showAlert = (msg) => {
-    const isError = msg.toLowerCase().includes('failed') || msg.toLowerCase().includes('error') || msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('please');
+  const showAlert = (msg, type = null) => {
+    let isError = false;
+    if (type) {
+      isError = type === 'error';
+    } else {
+      const lower = msg.toLowerCase();
+      const isSuccess = lower.includes('success') || lower.includes('welcome');
+      isError = !isSuccess && (lower.includes('failed') || lower.includes('error') || lower.includes('invalid') || lower.includes('please'));
+    }
     setToast({ msg, type: isError ? 'error' : 'success' });
     setTimeout(() => setToast(null), 4000);
   };
@@ -26,6 +53,7 @@ const Navbar = () => {
   const [otp, setOtp] = useState('');
   const [authType, setAuthType] = useState(''); // 'register' or 'login'
   const [isLoading, setIsLoading] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState(null);
 
   // Forgot password flow states
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
@@ -146,8 +174,42 @@ const Navbar = () => {
            return null;
         };
 
-        const parseJwt = (t) => {
-           try { return JSON.parse(atob(t.split('.')[1])); } catch (e) { return null; }
+
+
+        const findUserId = (obj) => {
+          if (!obj || typeof obj !== 'object') return null;
+          
+          const directKeys = ['user_id', 'userId', 'id', 'pk', 'uid', 'student_id', 'studentId'];
+          for (const key of directKeys) {
+            if (obj[key] !== undefined && obj[key] !== null) {
+              const val = parseInt(obj[key], 10);
+              if (!isNaN(val)) return val;
+            }
+          }
+          
+          if (obj.user && typeof obj.user === 'object') {
+            const val = findUserId(obj.user);
+            if (val) return val;
+          }
+          if (obj.student && typeof obj.student === 'object') {
+            const val = findUserId(obj.student);
+            if (val) return val;
+          }
+          if (obj.data && typeof obj.data === 'object') {
+            const val = findUserId(obj.data);
+            if (val) return val;
+          }
+          if (obj.user_details && typeof obj.user_details === 'object') {
+            const val = findUserId(obj.user_details);
+            if (val) return val;
+          }
+          
+          if (obj.user !== undefined && obj.user !== null) {
+            const val = parseInt(obj.user, 10);
+            if (!isNaN(val)) return val;
+          }
+          
+          return null;
         };
 
         const token = extractToken(data);
@@ -158,7 +220,7 @@ const Navbar = () => {
            localStorage.setItem('token', token);
            const decoded = parseJwt(token);
            if (decoded) {
-              returnedUserId = decoded.user_id || decoded.id || decoded.user;
+              returnedUserId = findUserId(decoded);
               const decodedStr = JSON.stringify(decoded).toLowerCase();
               if (decoded.role === 'admin' || decoded.isAdmin || decodedStr.includes('admin')) {
                  isAdmin = true;
@@ -167,15 +229,7 @@ const Navbar = () => {
         }
 
         if (!returnedUserId) {
-          if (data) {
-            returnedUserId = data.user_id || data.id || data.user || data.userId;
-            if (!returnedUserId && data.data) {
-               returnedUserId = data.data.user_id || data.data.id || data.data.user;
-            }
-            if (!returnedUserId && data.user_details) {
-               returnedUserId = data.user_details.id || data.user_details.user_id;
-            }
-          }
+          returnedUserId = findUserId(data);
         }
 
         if (isAdmin) {
@@ -183,8 +237,8 @@ const Navbar = () => {
            localStorage.setItem('adminToken', token || '');
            localStorage.setItem('isLoggedIn', 'true');
            if (returnedUserId) {
-              localStorage.setItem('adminUserId', returnedUserId.toString());
-              localStorage.setItem('userId', returnedUserId.toString());
+              localStorage.setItem('adminUserId', returnedUserId.toString()); setCurrentUserId(returnedUserId);
+              localStorage.setItem('userId', returnedUserId.toString()); setCurrentUserId(returnedUserId);
            }
            setIsLoggedIn(true);
            window.dispatchEvent(new Event('authChange'));
@@ -197,14 +251,17 @@ const Navbar = () => {
         }
         
         if (returnedUserId) {
-           localStorage.setItem('userId', returnedUserId.toString());
+           localStorage.setItem('userId', returnedUserId.toString()); setCurrentUserId(returnedUserId);
         } else {
            console.warn("Could not find user ID in response or token:", data);
         }
 
-        // Check if student is already fully registered with a profile
-        if (authType === 'login') {
-           let profileExists = false;
+                 // Check if student is already fully registered with a profile
+         if (authType === 'login') {
+            const successMsg = data.message || "Login successful";
+            showAlert(successMsg, 'success');
+            
+            let profileExists = false;
            let profileName = '';
            if (returnedUserId) {
              try {
@@ -244,12 +301,22 @@ const Navbar = () => {
              setProfileMode(false);
              window.location.hash = '#student';
            } else {
-             // No profile: show Complete Profile form
-             setOtpMode(false);
-             setProfileMode(true);
-             setIsLoginOpen(false);
-             setIsRegisterOpen(true);
-           }
+              // No profile: show Complete Profile form
+              setOtpMode(false);
+              setProfileMode(true);
+              setIsLoginOpen(false);
+              setIsRegisterOpen(true);
+
+              // Prefill student email
+              const emailVal = (decoded && decoded.email) || (data && data.data && data.data.email) || emailStr || '';
+              if (emailVal) {
+                localStorage.setItem('studentEmail', emailVal);
+              }
+              setProfileData(prev => ({
+                ...prev,
+                email: emailVal
+              }));
+            }
         } else if (authType === 'register') {
            setIsRegisterOpen(false);
            setOtpMode(false);
@@ -294,7 +361,32 @@ const Navbar = () => {
         setAuthType('register');
         setOtpMode(true);
       } else {
-        showAlert("Failed to send OTP for registration. Check email/password.");
+        const errData = await res.json().catch(() => ({}));
+        
+        const deepCheckAlreadyExists = (obj) => {
+          if (!obj) return false;
+          if (typeof obj === 'string') {
+            const lower = obj.toLowerCase();
+            return lower.includes('already') || lower.includes('exist') || lower.includes('registered');
+          }
+          if (Array.isArray(obj)) {
+            return obj.some(item => deepCheckAlreadyExists(item));
+          }
+          if (typeof obj === 'object') {
+            return Object.values(obj).some(val => deepCheckAlreadyExists(val));
+          }
+          return false;
+        };
+
+        if (deepCheckAlreadyExists(errData)) {
+          showAlert("User is already registered! Please login.", "error");
+          setIsRegisterOpen(false);
+          setIsLoginOpen(true);
+          setOtpMode(false);
+        } else {
+          const errMsg = errData.message || errData.error || (errData.email ? errData.email[0] : "") || "Failed to send OTP for registration. Check email/password.";
+          showAlert(errMsg);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -382,9 +474,45 @@ const Navbar = () => {
     e.preventDefault();
     try {
       setIsLoading(true);
-      const userId = localStorage.getItem('userId') || 1;
+      let userId = currentUserId || localStorage.getItem('userId');
+      if (!userId || userId === 'undefined' || userId === 'null' || isNaN(parseInt(userId, 10))) {
+        const token = localStorage.getItem('token');
+        if (token) {
+          try {
+            const decoded = parseJwt(token);
+            const findUserId = (obj) => {
+              if (!obj || typeof obj !== 'object') return null;
+              const directKeys = ['user_id', 'userId', 'id', 'pk', 'uid', 'student_id', 'studentId'];
+              for (const key of directKeys) {
+                if (obj[key] !== undefined && obj[key] !== null) {
+                  const val = parseInt(obj[key], 10);
+                  if (!isNaN(val)) return val;
+                }
+              }
+              if (obj.user && typeof obj.user === 'object') return findUserId(obj.user);
+              if (obj.student && typeof obj.student === 'object') return findUserId(obj.student);
+              if (obj.data && typeof obj.data === 'object') return findUserId(obj.data);
+              if (obj.user_details && typeof obj.user_details === 'object') return findUserId(obj.user_details);
+              if (obj.user !== undefined && obj.user !== null) {
+                const val = parseInt(obj.user, 10);
+                if (!isNaN(val)) return val;
+              }
+              return null;
+            };
+            const extractedId = findUserId(decoded);
+            if (extractedId) {
+              userId = extractedId.toString();
+              localStorage.setItem('userId', userId);
+            }
+          } catch (e) {
+            console.error("Failed to decode token for userId backup:", e);
+          }
+        }
+      }
+      
+      const finalUserId = userId && userId !== 'undefined' && userId !== 'null' ? parseInt(userId, 10) : 1;
       const payload = {
-        user: parseInt(userId, 10),
+        user: finalUserId,
         ...profileData
       };
       

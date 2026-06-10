@@ -15,6 +15,11 @@ const StudentPanel = () => {
   const handleLoginSuccess = () => {
     setIsLoggedIn(true);
     localStorage.setItem('isStudentLoggedIn', 'true');
+    localStorage.setItem('isLoggedIn', 'true');
+    if (!localStorage.getItem('userId')) {
+      localStorage.setItem('userId', '1');
+    }
+    window.dispatchEvent(new Event('authChange'));
   };
 
   const handleLogout = () => {

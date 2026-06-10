@@ -2,19 +2,32 @@ import React, { useState, useEffect } from 'react';
 import { BASE_URL } from '../../config';
 import { fetchQuizForCourse, getCourseQuizId } from '../../utils/quizUtils';
 import { getEnrolledCourseIds } from '../../utils/enrollmentUtils';
+import {
+  processCourseEnrollment,
+  navigateToPaymentResult,
+  appendLocalPaymentHistory
+} from '../../utils/paymentUtils';
 import Loader from '../Loader';
 
 const YouTubePlayer = ({ url, title, courseId, partNum, onVideoEnd }) => {
   const playerRef = React.useRef(null);
+  const ytPlayerRef = React.useRef(null);
   const [playerReady, setPlayerReady] = React.useState(false);
+  const [isPlaying, setIsPlaying] = React.useState(false);
+  const [currentTime, setCurrentTime] = React.useState(0);
+  const [duration, setDuration] = React.useState(0);
+  const [showControls, setShowControls] = React.useState(false);
+  const maxTimeWatchedRef = React.useRef(0);
+
   const userId = localStorage.getItem('userId') || 'guest';
   const progressKey = `videoTime_${userId}_${courseId}_${partNum}`;
+  const completedKey = `videoCompleted_${userId}_${courseId}_${partNum}`;
 
   const embedUrl = React.useMemo(() => {
     if (!url) return '';
     if (url.includes('/embed/')) {
       const base = url.split('?')[0];
-      return `${base}?enablejsapi=1&controls=1&rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&showinfo=0&fs=1`;
+      return `${base}?enablejsapi=1&controls=0&rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&showinfo=0&fs=0`;
     }
     let videoId = '';
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
@@ -26,7 +39,7 @@ const YouTubePlayer = ({ url, title, courseId, partNum, onVideoEnd }) => {
       else if (url.includes('youtu.be/')) videoId = url.split('youtu.be/')[1]?.split('?')[0];
     }
     if (videoId) {
-      return `https://www.youtube.com/embed/${videoId}?enablejsapi=1&controls=1&rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&showinfo=0&fs=1`;
+      return `https://www.youtube.com/embed/${videoId}?enablejsapi=1&controls=0&rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&showinfo=0&fs=0`;
     }
     return url;
   }, [url]);
@@ -49,24 +62,45 @@ const YouTubePlayer = ({ url, title, courseId, partNum, onVideoEnd }) => {
             events: {
               'onReady': (event) => {
                 setPlayerReady(true);
-                const savedTime = parseFloat(localStorage.getItem(progressKey) || '0');
-                if (savedTime > 0) {
-                  event.target.seekTo(savedTime, true);
-                }
+                ytPlayerRef.current = event.target;
                 
-                let maxTimeWatched = savedTime;
+                const dur = event.target.getDuration();
+                setDuration(dur);
+                
+                const videoCompleted = localStorage.getItem(completedKey) === 'true';
+                const savedTime = parseFloat(localStorage.getItem(progressKey) || '0');
+                
+                const shouldReset = videoCompleted || (dur > 0 && savedTime >= dur - 5);
+                
+                if (shouldReset) {
+                  event.target.seekTo(0, true);
+                  localStorage.setItem(progressKey, '0');
+                  maxTimeWatchedRef.current = 0;
+                  setCurrentTime(0);
+                } else if (savedTime > 0) {
+                  event.target.seekTo(savedTime, true);
+                  maxTimeWatchedRef.current = savedTime;
+                  setCurrentTime(savedTime);
+                } else {
+                  maxTimeWatchedRef.current = 0;
+                  setCurrentTime(0);
+                }
                 
                 timer = setInterval(() => {
                   if (event.target && typeof event.target.getCurrentTime === 'function' && typeof event.target.getPlayerState === 'function') {
                     const state = event.target.getPlayerState();
                     if (state === 1) { // PLAYING state
-                      const currentTime = event.target.getCurrentTime();
-                      if (currentTime > maxTimeWatched + 2.5) {
-                        event.target.seekTo(maxTimeWatched, true);
+                      const currTime = event.target.getCurrentTime();
+                      setCurrentTime(currTime);
+                      const isCurrentlyCompleted = localStorage.getItem(completedKey) === 'true';
+                      
+                      if (!isCurrentlyCompleted && currTime > maxTimeWatchedRef.current + 2.5) {
+                        event.target.seekTo(maxTimeWatchedRef.current, true);
+                        setCurrentTime(maxTimeWatchedRef.current);
                       } else {
-                        if (currentTime > maxTimeWatched) {
-                          maxTimeWatched = currentTime;
-                           localStorage.setItem(progressKey, currentTime.toString());
+                        if (currTime > maxTimeWatchedRef.current) {
+                          maxTimeWatchedRef.current = currTime;
+                          localStorage.setItem(progressKey, currTime.toString());
                         }
                       }
                     }
@@ -74,7 +108,11 @@ const YouTubePlayer = ({ url, title, courseId, partNum, onVideoEnd }) => {
                 }, 400);
               },
               'onStateChange': (event) => {
-                if (event.data === 0) { // 0 represents ENDED
+                const playerState = event.data;
+                setIsPlaying(playerState === 1);
+                
+                if (playerState === 0) { // 0 represents ENDED
+                  localStorage.setItem(completedKey, 'true');
                   if (typeof onVideoEnd === 'function') {
                     onVideoEnd();
                   }
@@ -100,23 +138,130 @@ const YouTubePlayer = ({ url, title, courseId, partNum, onVideoEnd }) => {
           ytPlayer.destroy();
         } catch(e) {}
       }
+      setIsPlaying(false);
+      setCurrentTime(0);
+      setDuration(0);
+      ytPlayerRef.current = null;
+      maxTimeWatchedRef.current = 0;
     };
-  }, [embedUrl, progressKey]);
+  }, [embedUrl, progressKey, completedKey]);
+
+  const togglePlay = (e) => {
+    if (e) e.stopPropagation();
+    if (ytPlayerRef.current && playerReady) {
+      const state = ytPlayerRef.current.getPlayerState();
+      if (state === 1) { // playing
+        ytPlayerRef.current.pauseVideo();
+        setIsPlaying(false);
+      } else {
+        ytPlayerRef.current.playVideo();
+        setIsPlaying(true);
+      }
+    }
+  };
+
+  const handleSeek = (e) => {
+    const seekToTime = parseFloat(e.target.value);
+    if (ytPlayerRef.current && playerReady) {
+      const isCurrentlyCompleted = localStorage.getItem(completedKey) === 'true';
+      if (!isCurrentlyCompleted && seekToTime > maxTimeWatchedRef.current) {
+        return;
+      }
+      ytPlayerRef.current.seekTo(seekToTime, true);
+      setCurrentTime(seekToTime);
+    }
+  };
+
+  const formatTime = (seconds) => {
+    if (isNaN(seconds) || seconds === undefined) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
 
   return (
-    <div className="aspect-video w-full rounded-xl overflow-hidden bg-slate-900 border border-slate-200 shadow-inner relative">
-      {embedUrl ? (
-        <iframe 
-          ref={playerRef}
-          src={embedUrl} 
-          title={title}
-          className="w-full h-full"
-          allow="autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-          allowFullScreen
-          sandbox="allow-scripts allow-same-origin allow-presentation allow-orientation-lock"
-        ></iframe>
-      ) : (
-        <div className="w-full h-full flex items-center justify-center text-slate-400 font-semibold">No Video Configured</div>
+    <div 
+      className="relative w-full aspect-video rounded-xl overflow-hidden bg-slate-950 border border-slate-200 shadow-inner group"
+      onMouseEnter={() => setShowControls(true)}
+      onMouseLeave={() => setShowControls(false)}
+    >
+      {/* Embedded Iframe Container with crop styling */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {embedUrl ? (
+          <iframe 
+            ref={playerRef}
+            src={embedUrl} 
+            title={title}
+            style={{
+              position: 'absolute',
+              top: '-45px',
+              left: 0,
+              width: '100%',
+              height: 'calc(100% + 90px)',
+              border: 'none',
+              pointerEvents: 'none'
+            }}
+            allow="autoplay; encrypted-media; gyroscope; picture-in-picture"
+            sandbox="allow-scripts allow-same-origin allow-presentation"
+          ></iframe>
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-slate-400 font-semibold">No Video Configured</div>
+        )}
+      </div>
+
+      {/* Click overlay to play/pause */}
+      <div 
+        onClick={togglePlay}
+        className="absolute inset-0 cursor-pointer z-10 flex items-center justify-center"
+      >
+        {!isPlaying && playerReady && (
+          <div className="w-16 h-16 bg-black/60 hover:bg-emerald-600/90 text-white rounded-full flex items-center justify-center shadow-lg transition-all transform hover:scale-110 active:scale-95 duration-200">
+            <svg className="w-8 h-8 fill-current ml-1" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </div>
+        )}
+      </div>
+
+      {/* Custom Glassmorphic Controls Bar */}
+      {playerReady && (
+        <div 
+          className={`absolute bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur-md border-t border-white/10 px-4 py-3 z-20 flex items-center gap-3 transition-opacity duration-300 ${showControls || !isPlaying ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Play/Pause Button */}
+          <button 
+            onClick={togglePlay}
+            className="text-white hover:text-emerald-400 transition-colors focus:outline-none shrink-0"
+          >
+            {isPlaying ? (
+              <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+              </svg>
+            ) : (
+              <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            )}
+          </button>
+
+          {/* Progress Bar / Scrubber */}
+          <div className="relative flex-grow flex items-center h-2 group/slider">
+            <input 
+              type="range" 
+              min={0} 
+              max={duration || 100} 
+              value={currentTime} 
+              onChange={handleSeek}
+              className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-emerald-500 hover:accent-emerald-400 outline-none"
+            />
+          </div>
+
+          {/* Timer Display */}
+          <span className="text-white text-xs font-mono shrink-0 select-none">
+            {formatTime(currentTime)} / {formatTime(duration)}
+          </span>
+        </div>
       )}
     </div>
   );
@@ -126,6 +271,10 @@ const StudentEnrolledCourses = () => {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeCourse, setActiveCourse] = useState(null);
+  const [allCourses, setAllCourses] = useState([]);
+  const [enrolledCourseIds, setEnrolledCourseIds] = useState([]);
+  const [activePaymentCourse, setActivePaymentCourse] = useState(null);
+  const [isPaying, setIsPaying] = useState(false);
   
   // Lesson Progression states
   const [currentPart, setCurrentPart] = useState(1); // currently active lesson/part index
@@ -358,9 +507,13 @@ const StudentEnrolledCourses = () => {
         ]);
         const data = await coursesRes.json();
         if (data.success && data.data) {
+          setAllCourses(data.data);
           const enrolled = enrolledIds.length
             ? enrolledIds
             : JSON.parse(localStorage.getItem(`enrolledCourses_${userId}`) || '[]');
+          
+          setEnrolledCourseIds(enrolled.map(id => id.toString()));
+          
           const filtered = data.data.filter((course) =>
             enrolled.some((id) => id.toString() === course.id.toString())
           );
@@ -382,7 +535,113 @@ const StudentEnrolledCourses = () => {
   }, [activeCourse]);
 
   useEffect(() => {
-    if (activeCourse) {
+    const refreshEnrollments = async () => {
+    const userId = localStorage.getItem('userId') || 'guest';
+    if (!userId || userId === 'guest') {
+      setEnrolledCourseIds([]);
+      return;
+    }
+    const ids = await getEnrolledCourseIds(userId);
+    setEnrolledCourseIds(ids.map(id => id.toString()));
+    
+    try {
+      const res = await fetch(`${BASE_URL}/bsgupadmin/createcourse/`);
+      const data = await res.json();
+      if (data.success && data.data) {
+        setAllCourses(data.data);
+        const filtered = data.data.filter((course) =>
+          ids.some((id) => id.toString() === course.id.toString())
+        );
+        setCourses(filtered);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const runEnrollment = async (course) => {
+    const userId = localStorage.getItem('userId') || 'guest';
+    setIsPaying(true);
+    const finalCourseId = course.id;
+    try {
+      if (!finalCourseId) throw new Error('finalCourseId is null or undefined');
+      if (!userId || userId === 'guest') throw new Error('Please log in to enroll');
+      
+      const result = await processCourseEnrollment({
+        userId,
+        courseId: finalCourseId,
+        courseTitle: course.title,
+        coursePrice: course.price
+      });
+
+      if (result.status === 'already_enrolled') {
+        alert(result.message || 'You are already enrolled in this course!');
+        await refreshEnrollments();
+        return;
+      }
+
+      if (result.type === 'paid') {
+        appendLocalPaymentHistory(userId, {
+          courseTitle: course.title,
+          amount: result.amount,
+          status: 'Paid'
+        });
+      }
+
+      await refreshEnrollments();
+      window.dispatchEvent(new Event('enrollmentChange'));
+
+      navigateToPaymentResult('success', {
+        message: result.message,
+        courseTitle: course.title,
+        amount: result.amount,
+        orderId: result.orderId
+      });
+    } catch (err) {
+      console.error(err);
+      alert(`Payment error: ${err.message || 'Unknown error'}`);
+      navigateToPaymentResult('failed', {
+        message: err.message || 'Payment failed. Please try again.',
+        courseTitle: course.title,
+        amount: course.price
+      });
+    } finally {
+      setIsPaying(false);
+      setActivePaymentCourse(null);
+    }
+  };
+
+  const handleEnroll = async (course) => {
+    const userId = localStorage.getItem('userId') || 'guest';
+    if (!userId || userId === 'guest') {
+      alert('Please log in to enroll in this course.');
+      return;
+    }
+
+    if (enrolledCourseIds.some((id) => id.toString() === course.id.toString())) {
+      alert('You are already enrolled in this course!');
+      return;
+    }
+
+    const isFree = course.price == 0 || course.price == '0' || course.price == '0.00';
+    if (isFree) {
+      await runEnrollment(course);
+    } else {
+      setActivePaymentCourse(course);
+    }
+  };
+
+  const executePayment = async () => {
+    if (!activePaymentCourse) return;
+    try {
+      await runEnrollment(activePaymentCourse);
+    } catch (err) {
+      console.error('executePayment error:', err);
+      alert('Payment flow error: ' + (err.message || 'See console'));
+    }
+  };
+
+  if (activeCourse) {
       const fetchCourseLessons = async () => {
         setLessonsLoading(true);
         try {
@@ -403,7 +662,113 @@ const StudentEnrolledCourses = () => {
   }, [activeCourse]);
 
   useEffect(() => {
-    if (activeCourse) {
+    const refreshEnrollments = async () => {
+    const userId = localStorage.getItem('userId') || 'guest';
+    if (!userId || userId === 'guest') {
+      setEnrolledCourseIds([]);
+      return;
+    }
+    const ids = await getEnrolledCourseIds(userId);
+    setEnrolledCourseIds(ids.map(id => id.toString()));
+    
+    try {
+      const res = await fetch(`${BASE_URL}/bsgupadmin/createcourse/`);
+      const data = await res.json();
+      if (data.success && data.data) {
+        setAllCourses(data.data);
+        const filtered = data.data.filter((course) =>
+          ids.some((id) => id.toString() === course.id.toString())
+        );
+        setCourses(filtered);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const runEnrollment = async (course) => {
+    const userId = localStorage.getItem('userId') || 'guest';
+    setIsPaying(true);
+    const finalCourseId = course.id;
+    try {
+      if (!finalCourseId) throw new Error('finalCourseId is null or undefined');
+      if (!userId || userId === 'guest') throw new Error('Please log in to enroll');
+      
+      const result = await processCourseEnrollment({
+        userId,
+        courseId: finalCourseId,
+        courseTitle: course.title,
+        coursePrice: course.price
+      });
+
+      if (result.status === 'already_enrolled') {
+        alert(result.message || 'You are already enrolled in this course!');
+        await refreshEnrollments();
+        return;
+      }
+
+      if (result.type === 'paid') {
+        appendLocalPaymentHistory(userId, {
+          courseTitle: course.title,
+          amount: result.amount,
+          status: 'Paid'
+        });
+      }
+
+      await refreshEnrollments();
+      window.dispatchEvent(new Event('enrollmentChange'));
+
+      navigateToPaymentResult('success', {
+        message: result.message,
+        courseTitle: course.title,
+        amount: result.amount,
+        orderId: result.orderId
+      });
+    } catch (err) {
+      console.error(err);
+      alert(`Payment error: ${err.message || 'Unknown error'}`);
+      navigateToPaymentResult('failed', {
+        message: err.message || 'Payment failed. Please try again.',
+        courseTitle: course.title,
+        amount: course.price
+      });
+    } finally {
+      setIsPaying(false);
+      setActivePaymentCourse(null);
+    }
+  };
+
+  const handleEnroll = async (course) => {
+    const userId = localStorage.getItem('userId') || 'guest';
+    if (!userId || userId === 'guest') {
+      alert('Please log in to enroll in this course.');
+      return;
+    }
+
+    if (enrolledCourseIds.some((id) => id.toString() === course.id.toString())) {
+      alert('You are already enrolled in this course!');
+      return;
+    }
+
+    const isFree = course.price == 0 || course.price == '0' || course.price == '0.00';
+    if (isFree) {
+      await runEnrollment(course);
+    } else {
+      setActivePaymentCourse(course);
+    }
+  };
+
+  const executePayment = async () => {
+    if (!activePaymentCourse) return;
+    try {
+      await runEnrollment(activePaymentCourse);
+    } catch (err) {
+      console.error('executePayment error:', err);
+      alert('Payment flow error: ' + (err.message || 'See console'));
+    }
+  };
+
+  if (activeCourse) {
       const userId = localStorage.getItem('userId') || 'guest';
       
       const fetchProgress = async () => {
@@ -444,7 +809,113 @@ const StudentEnrolledCourses = () => {
   }, [activeCourse]);
 
   const updateUnlockedProgress = (newVal) => {
-    if (activeCourse) {
+    const refreshEnrollments = async () => {
+    const userId = localStorage.getItem('userId') || 'guest';
+    if (!userId || userId === 'guest') {
+      setEnrolledCourseIds([]);
+      return;
+    }
+    const ids = await getEnrolledCourseIds(userId);
+    setEnrolledCourseIds(ids.map(id => id.toString()));
+    
+    try {
+      const res = await fetch(`${BASE_URL}/bsgupadmin/createcourse/`);
+      const data = await res.json();
+      if (data.success && data.data) {
+        setAllCourses(data.data);
+        const filtered = data.data.filter((course) =>
+          ids.some((id) => id.toString() === course.id.toString())
+        );
+        setCourses(filtered);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const runEnrollment = async (course) => {
+    const userId = localStorage.getItem('userId') || 'guest';
+    setIsPaying(true);
+    const finalCourseId = course.id;
+    try {
+      if (!finalCourseId) throw new Error('finalCourseId is null or undefined');
+      if (!userId || userId === 'guest') throw new Error('Please log in to enroll');
+      
+      const result = await processCourseEnrollment({
+        userId,
+        courseId: finalCourseId,
+        courseTitle: course.title,
+        coursePrice: course.price
+      });
+
+      if (result.status === 'already_enrolled') {
+        alert(result.message || 'You are already enrolled in this course!');
+        await refreshEnrollments();
+        return;
+      }
+
+      if (result.type === 'paid') {
+        appendLocalPaymentHistory(userId, {
+          courseTitle: course.title,
+          amount: result.amount,
+          status: 'Paid'
+        });
+      }
+
+      await refreshEnrollments();
+      window.dispatchEvent(new Event('enrollmentChange'));
+
+      navigateToPaymentResult('success', {
+        message: result.message,
+        courseTitle: course.title,
+        amount: result.amount,
+        orderId: result.orderId
+      });
+    } catch (err) {
+      console.error(err);
+      alert(`Payment error: ${err.message || 'Unknown error'}`);
+      navigateToPaymentResult('failed', {
+        message: err.message || 'Payment failed. Please try again.',
+        courseTitle: course.title,
+        amount: course.price
+      });
+    } finally {
+      setIsPaying(false);
+      setActivePaymentCourse(null);
+    }
+  };
+
+  const handleEnroll = async (course) => {
+    const userId = localStorage.getItem('userId') || 'guest';
+    if (!userId || userId === 'guest') {
+      alert('Please log in to enroll in this course.');
+      return;
+    }
+
+    if (enrolledCourseIds.some((id) => id.toString() === course.id.toString())) {
+      alert('You are already enrolled in this course!');
+      return;
+    }
+
+    const isFree = course.price == 0 || course.price == '0' || course.price == '0.00';
+    if (isFree) {
+      await runEnrollment(course);
+    } else {
+      setActivePaymentCourse(course);
+    }
+  };
+
+  const executePayment = async () => {
+    if (!activePaymentCourse) return;
+    try {
+      await runEnrollment(activePaymentCourse);
+    } catch (err) {
+      console.error('executePayment error:', err);
+      alert('Payment flow error: ' + (err.message || 'See console'));
+    }
+  };
+
+  if (activeCourse) {
       const userId = localStorage.getItem('userId') || 'guest';
       const key = `unlockedPart_${userId}_${activeCourse.id}`;
       localStorage.setItem(key, newVal.toString());
@@ -683,6 +1154,112 @@ const StudentEnrolledCourses = () => {
   };
 
   // If in Course Viewer/Study mode
+  const refreshEnrollments = async () => {
+    const userId = localStorage.getItem('userId') || 'guest';
+    if (!userId || userId === 'guest') {
+      setEnrolledCourseIds([]);
+      return;
+    }
+    const ids = await getEnrolledCourseIds(userId);
+    setEnrolledCourseIds(ids.map(id => id.toString()));
+    
+    try {
+      const res = await fetch(`${BASE_URL}/bsgupadmin/createcourse/`);
+      const data = await res.json();
+      if (data.success && data.data) {
+        setAllCourses(data.data);
+        const filtered = data.data.filter((course) =>
+          ids.some((id) => id.toString() === course.id.toString())
+        );
+        setCourses(filtered);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const runEnrollment = async (course) => {
+    const userId = localStorage.getItem('userId') || 'guest';
+    setIsPaying(true);
+    const finalCourseId = course.id;
+    try {
+      if (!finalCourseId) throw new Error('finalCourseId is null or undefined');
+      if (!userId || userId === 'guest') throw new Error('Please log in to enroll');
+      
+      const result = await processCourseEnrollment({
+        userId,
+        courseId: finalCourseId,
+        courseTitle: course.title,
+        coursePrice: course.price
+      });
+
+      if (result.status === 'already_enrolled') {
+        alert(result.message || 'You are already enrolled in this course!');
+        await refreshEnrollments();
+        return;
+      }
+
+      if (result.type === 'paid') {
+        appendLocalPaymentHistory(userId, {
+          courseTitle: course.title,
+          amount: result.amount,
+          status: 'Paid'
+        });
+      }
+
+      await refreshEnrollments();
+      window.dispatchEvent(new Event('enrollmentChange'));
+
+      navigateToPaymentResult('success', {
+        message: result.message,
+        courseTitle: course.title,
+        amount: result.amount,
+        orderId: result.orderId
+      });
+    } catch (err) {
+      console.error(err);
+      alert(`Payment error: ${err.message || 'Unknown error'}`);
+      navigateToPaymentResult('failed', {
+        message: err.message || 'Payment failed. Please try again.',
+        courseTitle: course.title,
+        amount: course.price
+      });
+    } finally {
+      setIsPaying(false);
+      setActivePaymentCourse(null);
+    }
+  };
+
+  const handleEnroll = async (course) => {
+    const userId = localStorage.getItem('userId') || 'guest';
+    if (!userId || userId === 'guest') {
+      alert('Please log in to enroll in this course.');
+      return;
+    }
+
+    if (enrolledCourseIds.some((id) => id.toString() === course.id.toString())) {
+      alert('You are already enrolled in this course!');
+      return;
+    }
+
+    const isFree = course.price == 0 || course.price == '0' || course.price == '0.00';
+    if (isFree) {
+      await runEnrollment(course);
+    } else {
+      setActivePaymentCourse(course);
+    }
+  };
+
+  const executePayment = async () => {
+    if (!activePaymentCourse) return;
+    try {
+      await runEnrollment(activePaymentCourse);
+    } catch (err) {
+      console.error('executePayment error:', err);
+      alert('Payment flow error: ' + (err.message || 'See console'));
+    }
+  };
+
   if (activeCourse) {
     if (lessonsLoading) {
       return (
@@ -1165,36 +1742,129 @@ const StudentEnrolledCourses = () => {
       {loading ? (
         <Loader message="Loading your courses..." />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {courses.map(course => (
-            <div key={course.id} className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-shadow duration-300 overflow-hidden flex flex-col border border-slate-200">
-              {course.course_profile_pic ? (
-                <img src={`${BASE_URL}${course.course_profile_pic}`} alt={course.title} className="w-full h-48 object-cover" />
-              ) : (
-                <div className="w-full h-48 bg-slate-200 flex items-center justify-center text-slate-400">No Image provided</div>
-              )}
-              <div className="p-5 flex-grow flex flex-col">
-                <h4 className="text-xl font-bold text-slate-800 mb-2 leading-tight">{course.title}</h4>
-                <p className="text-sm text-slate-600 mb-4 line-clamp-2">{course.description}</p>
-                <div className="mt-auto pt-4 border-t border-slate-100">
-                   <button 
-                     onClick={() => setActiveCourse(course)}
-                     className="w-full bg-[#7c3aed] text-white font-bold py-2.5 rounded-lg hover:bg-[#6d28d9] transition-colors"
-                   >
-                     Continue Learning
-                   </button>
+        <div>
+          {courses.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {courses.map(course => (
+                <div key={course.id} className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-shadow duration-300 overflow-hidden flex flex-col border border-slate-200">
+                  {course.course_profile_pic ? (
+                    <img src={`${BASE_URL}${course.course_profile_pic}`} alt={course.title} className="w-full h-48 object-cover" />
+                  ) : (
+                    <div className="w-full h-48 bg-slate-200 flex items-center justify-center text-slate-400">No Image provided</div>
+                  )}
+                  <div className="p-5 flex-grow flex flex-col text-left">
+                    <h4 className="text-xl font-bold text-slate-800 mb-2 leading-tight">{course.title}</h4>
+                    <p className="text-sm text-slate-600 mb-4 line-clamp-2">{course.description}</p>
+                    <div className="mt-auto pt-4 border-t border-slate-100">
+                       <button 
+                         onClick={() => setActiveCourse(course)}
+                         className="w-full bg-[#7c3aed] text-white font-bold py-2.5 rounded-lg hover:bg-[#6d28d9] transition-colors"
+                       >
+                         Continue Learning
+                       </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          ))}
-          {courses.length === 0 && (
-            <div className="col-span-full bg-white p-10 rounded-2xl border border-slate-200 text-center">
-              <div className="text-5xl mb-4">😢</div>
-              <h3 className="text-xl font-bold text-slate-800 mb-2">You haven't enrolled in any courses yet!</h3>
-              <p className="text-slate-500 mb-6">Explore our catalog and find the perfect course for you.</p>
-              <button onClick={() => window.location.hash = '#courses'} className="bg-emerald-500 text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-emerald-600 transition-colors">Browse Courses</button>
+              ))}
             </div>
           )}
+
+          {courses.length === 0 && (
+            <div className="col-span-full bg-white p-10 rounded-2xl border border-slate-200 text-center mb-10">
+              <div className="text-5xl mb-4">😢</div>
+              <h3 className="text-xl font-bold text-slate-800 mb-2">You haven't enrolled in any courses yet!</h3>
+              <p className="text-slate-500 mb-6">Explore our catalog below and find the perfect course for you.</p>
+            </div>
+          )}
+
+          {/* Available Courses Section */}
+          {allCourses.length > 0 && (
+            <div className="mt-12 border-t border-slate-200 pt-10">
+              <div className="mb-6 text-left">
+                <h3 className="text-2xl font-bold text-slate-800">Available Courses to Enroll</h3>
+                <p className="text-slate-500 mt-1">Select from our list of courses and enroll to start learning.</p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {allCourses
+                  .filter(course => !enrolledCourseIds.includes(course.id.toString()))
+                  .map(course => {
+                    const isFree = course.price == 0 || course.price == '0' || course.price == '0.00';
+                    return (
+                      <div key={course.id} className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-shadow duration-300 overflow-hidden flex flex-col border border-slate-200">
+                        {course.course_profile_pic ? (
+                          <img src={`${BASE_URL}${course.course_profile_pic}`} alt={course.title} className="w-full h-44 object-cover" />
+                        ) : (
+                          <div className="w-full h-44 bg-slate-200 flex items-center justify-center text-slate-400">No Image</div>
+                        )}
+                        <div className="p-5 flex-grow flex flex-col text-left">
+                          <h4 className="text-lg font-bold text-slate-800 mb-2 leading-tight">{course.title}</h4>
+                          <p className="text-sm text-slate-600 mb-4 line-clamp-2">{course.description}</p>
+                          <div className="flex justify-between items-center text-sm font-semibold bg-slate-50 p-2 rounded border border-slate-100 mb-4 mt-auto">
+                            <span className="text-emerald-500">
+                              {isFree ? 'Free' : `₹${course.price}`}
+                            </span>
+                            <span className="text-slate-500">{course.duration || '4 Weeks'}</span>
+                          </div>
+                          <button 
+                            onClick={() => handleEnroll(course)}
+                            className="w-full font-semibold py-2.5 bg-emerald-500 text-white hover:bg-emerald-600 rounded-lg transition-colors"
+                          >
+                             {isFree ? 'Start Free Course' : 'Enroll & Pay'}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                {allCourses.filter(course => !enrolledCourseIds.includes(course.id.toString())).length === 0 && (
+                  <p className="text-slate-500 text-base col-span-full text-center py-6">You are enrolled in all available courses!</p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Payment Modal */}
+      {activePaymentCourse && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl p-6 border border-slate-100 relative">
+            <h3 className="text-2xl font-bold text-slate-800 mb-2">Buy Course</h3>
+            <p className="text-slate-500 mb-6">You will be redirected to Razorpay to complete your secure payment.</p>
+            
+            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 mb-6 text-left">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Course Title</p>
+              <h4 className="text-lg font-bold text-slate-800 mb-3">{activePaymentCourse.title}</h4>
+              
+              <div className="flex justify-between border-t border-slate-200 pt-3">
+                <span className="font-semibold text-slate-600">Total Price</span>
+                <span className="font-bold text-xl text-emerald-600">₹{activePaymentCourse.price}</span>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <button 
+                onClick={executePayment}
+                disabled={isPaying}
+                className="w-full bg-emerald-500 text-white font-bold py-3.5 rounded-xl hover:bg-emerald-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isPaying ? (
+                  <>
+                    <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    Processing Payment...
+                  </>
+                ) : (
+                  `Pay ₹${activePaymentCourse.price} with Razorpay`
+                )}
+              </button>
+              <button 
+                onClick={() => setActivePaymentCourse(null)}
+                disabled={isPaying}
+                className="w-full bg-slate-100 text-slate-600 font-bold py-3 rounded-xl hover:bg-slate-200 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

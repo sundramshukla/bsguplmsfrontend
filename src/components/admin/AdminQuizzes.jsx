@@ -209,22 +209,20 @@ const AdminQuizzes = () => {
       };
 
       if (isEditing) {
-        payload.id = parseInt(existingQuiz.id, 10);
-        payload.quiz_id = parseInt(existingQuiz.id, 10);
-      }
+        // Find existing quiz to get its questions
+        const targetQuiz = allQuizzes.find(q => q.id.toString() === existingQuiz.id.toString());
+        const questionsList = targetQuiz ? (targetQuiz.questions || []) : [];
 
-      const method = isEditing ? 'PUT' : 'POST';
-      const res = await fetch(`${BASE_URL}/bsgupadmin/create-quiz/`, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
+        // Recreate quiz with updated parameters but same questions
+        const newQuizId = await recreateQuizWithQuestions(selectedCourseId, {
+          id: existingQuiz.id,
+          title: quizForm.title,
+          total_marks: quizForm.total_marks,
+          passing_marks: quizForm.passing_marks,
+          duration: quizForm.duration
+        }, questionsList);
 
-      if (res.ok || data.success) {
-        alert(data.message || data.success || (isEditing ? "Quiz Updated Successfully!" : "Quiz Created Successfully!"));
-        const newQuizId = (data.data?.quiz_id || data.quiz_id || data.id || (isEditing ? existingQuiz.id : "1")).toString();
-        saveCourseQuizMapping(selectedCourseId, newQuizId);
+        alert("Quiz Updated Successfully!");
         setQuizIdForQuestion(newQuizId);
         setExistingQuiz({
           id: newQuizId,
@@ -234,14 +232,42 @@ const AdminQuizzes = () => {
           duration: quizForm.duration
         });
 
-        // Reload existing quizzes list to show updated details
+        // Reload existing quizzes list
         const coursesRes = await fetch(`${BASE_URL}/bsgupadmin/createcourse/`);
         const coursesData = await coursesRes.json();
         if (coursesData.success && coursesData.data) {
           fetchAllExistingQuizzes(coursesData.data);
         }
       } else {
-        alert(data.error || "Failed to save quiz.");
+        const res = await fetch(`${BASE_URL}/bsgupadmin/create-quiz/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (res.ok || data.success) {
+          alert(data.message || data.success || "Quiz Created Successfully!");
+          const newQuizId = (data.data?.quiz_id || data.quiz_id || data.id || "1").toString();
+          saveCourseQuizMapping(selectedCourseId, newQuizId);
+          setQuizIdForQuestion(newQuizId);
+          setExistingQuiz({
+            id: newQuizId,
+            title: quizForm.title,
+            total_marks: quizForm.total_marks,
+            passing_marks: quizForm.passing_marks,
+            duration: quizForm.duration
+          });
+
+          // Reload existing quizzes list to show updated details
+          const coursesRes = await fetch(`${BASE_URL}/bsgupadmin/createcourse/`);
+          const coursesData = await coursesRes.json();
+          if (coursesData.success && coursesData.data) {
+            fetchAllExistingQuizzes(coursesData.data);
+          }
+        } else {
+          alert(data.error || "Failed to save quiz.");
+        }
       }
     } catch (err) {
       console.error(err);
@@ -337,11 +363,75 @@ const AdminQuizzes = () => {
     correct_answer: ''
   });
 
+  const recreateQuizWithQuestions = async (courseId, quizDetails, questionsList) => {
+    // 1. Delete the old quiz if it exists
+    if (quizDetails.id) {
+      const adminUserId = localStorage.getItem('adminUserId') || localStorage.getItem('userId') || 2;
+      const delRes = await fetch(`${BASE_URL}/bsgupadmin/create-quiz/?quiz_id=${quizDetails.id}&user_id=${adminUserId}`, {
+        method: 'DELETE'
+      });
+      if (!delRes.ok) {
+        throw new Error("Failed to delete the old quiz version.");
+      }
+    }
+
+    // 2. Create the new quiz
+    const adminUserId = localStorage.getItem('adminUserId') || localStorage.getItem('userId') || 2;
+    const quizPayload = {
+      user_id: parseInt(adminUserId, 10),
+      course_id: parseInt(courseId, 10),
+      title: quizDetails.title,
+      total_marks: parseInt(quizDetails.total_marks, 10),
+      passing_marks: parseInt(quizDetails.passing_marks, 10),
+      duration: parseInt(quizDetails.duration, 10)
+    };
+
+    const createRes = await fetch(`${BASE_URL}/bsgupadmin/create-quiz/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(quizPayload)
+    });
+    if (!createRes.ok) {
+      throw new Error("Failed to create the new quiz version.");
+    }
+    const createData = await createRes.json();
+    const newQuizId = (createData.data?.quiz_id || createData.quiz_id || createData.id || "1").toString();
+
+    // 3. Add all questions to the new quiz
+    for (const q of questionsList) {
+      const qPayload = {
+        user_id: parseInt(adminUserId, 10),
+        quiz_id: parseInt(newQuizId, 10),
+        question: q.question,
+        option1: q.option1,
+        option2: q.option2,
+        option3: q.option3,
+        option4: q.option4,
+        correct_answer: q.correct_answer
+      };
+
+      const qRes = await fetch(`${BASE_URL}/bsgupadmin/create-question/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(qPayload)
+      });
+      if (!qRes.ok) {
+        console.error("Failed to add question:", q.question);
+      }
+    }
+
+    // 4. Save the mapping locally
+    saveCourseQuizMapping(courseId, newQuizId);
+    
+    return newQuizId;
+  };
+
   const handleDeleteQuiz = async (quizId) => {
     if (!window.confirm("Are you sure you want to delete this entire quiz?")) return;
     setIsLoading(true);
     try {
-      const res = await fetch(`${BASE_URL}/bsgupadmin/create-quiz/?quiz_id=${quizId}`, {
+      const adminUserId = localStorage.getItem('adminUserId') || localStorage.getItem('userId') || 2;
+      const res = await fetch(`${BASE_URL}/bsgupadmin/create-quiz/?quiz_id=${quizId}&user_id=${adminUserId}`, {
         method: 'DELETE'
       });
       const data = await res.json();
@@ -366,23 +456,29 @@ const AdminQuizzes = () => {
     if (!window.confirm("Are you sure you want to delete this question?")) return;
     setIsLoading(true);
     try {
-      const res = await fetch(`${BASE_URL}/bsgupadmin/create-question/?question_id=${questionId}`, {
-        method: 'DELETE'
-      });
-      const data = await res.json();
-      if (res.ok || data.success) {
-        alert(data.message || data.success || "Question Deleted Successfully!");
-        setAllQuizzes(prev => prev.map(q => {
-          if (q.id.toString() === quizId.toString()) {
-            return {
-              ...q,
-              questions: q.questions.filter(quest => (quest.id || quest.question_id || quest.order)?.toString() !== questionId.toString())
-            };
-          }
-          return q;
-        }));
-      } else {
-        alert(data.error || "Failed to delete question.");
+      const targetQuiz = allQuizzes.find(q => q.id.toString() === quizId.toString());
+      if (!targetQuiz) {
+        alert("Quiz not found.");
+        return;
+      }
+      const questionsList = (targetQuiz.questions || []).filter(
+        quest => (quest.id || quest.question_id || quest.order)?.toString() !== questionId.toString()
+      );
+
+      const newQuizId = await recreateQuizWithQuestions(targetQuiz.courseId, targetQuiz, questionsList);
+      alert("Question Deleted Successfully!");
+
+      // If we are currently editing this quiz, update the active quiz ID
+      if (existingQuiz && existingQuiz.id.toString() === quizId.toString()) {
+        setExistingQuiz(prev => ({ ...prev, id: newQuizId }));
+        setQuizIdForQuestion(newQuizId);
+      }
+
+      // Reload existing quizzes list to reflect updated quiz ID and questions
+      const coursesRes = await fetch(`${BASE_URL}/bsgupadmin/createcourse/`);
+      const coursesData = await coursesRes.json();
+      if (coursesData.success && coursesData.data) {
+        fetchAllExistingQuizzes(coursesData.data);
       }
     } catch (err) {
       console.error("Error deleting question:", err);
@@ -414,52 +510,35 @@ const AdminQuizzes = () => {
         payload.question_id = activeEditQuestionId;
       }
 
-      const method = isEditing ? 'PUT' : 'POST';
-      const res = await fetch(`${BASE_URL}/bsgupadmin/create-question/`, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
+      if (isEditing) {
+        const targetQuiz = allQuizzes.find(q => q.id.toString() === activeAddQuestionQuizId.toString());
+        if (!targetQuiz) {
+          alert("Quiz not found.");
+          return;
+        }
 
-      if (res.ok || data.success) {
-        alert(data.message || data.success || (isEditing ? "Question Updated Successfully!" : "Question Added Successfully!"));
+        const updatedQuestionsList = (targetQuiz.questions || []).map(quest => {
+          if ((quest.id || quest.question_id || quest.order)?.toString() === activeEditQuestionId.toString()) {
+            return {
+              ...quest,
+              question: modalQuestionForm.question,
+              option1: modalQuestionForm.option1,
+              option2: modalQuestionForm.option2,
+              option3: modalQuestionForm.option3,
+              option4: modalQuestionForm.option4,
+              correct_answer: modalQuestionForm.correct_answer
+            };
+          }
+          return quest;
+        });
 
-        const refreshed = await fetchQuizById(activeAddQuestionQuizId);
-        if (refreshed) {
-          setAllQuizzes(prev => prev.map(q => {
-            if (q.id.toString() === activeAddQuestionQuizId.toString()) {
-              return { ...q, questions: refreshed.questions };
-            }
-            return q;
-          }));
-        } else {
-          const newQuestionObj = {
-            id: isEditing ? activeEditQuestionId : (data.data?.question_id || data.question_id || Date.now().toString()),
-            question: modalQuestionForm.question,
-            option1: modalQuestionForm.option1,
-            option2: modalQuestionForm.option2,
-            option3: modalQuestionForm.option3,
-            option4: modalQuestionForm.option4,
-            correct_answer: modalQuestionForm.correct_answer
-          };
+        const newQuizId = await recreateQuizWithQuestions(targetQuiz.courseId, targetQuiz, updatedQuestionsList);
+        alert("Question Updated Successfully!");
 
-          setAllQuizzes(prev => prev.map(q => {
-            if (q.id.toString() === activeAddQuestionQuizId.toString()) {
-              if (isEditing) {
-                return {
-                  ...q,
-                  questions: q.questions.map(quest => (quest.id || quest.question_id || quest.order)?.toString() === activeEditQuestionId.toString() ? newQuestionObj : quest)
-                };
-              } else {
-                return {
-                  ...q,
-                  questions: [...(q.questions || []), newQuestionObj]
-                };
-              }
-            }
-            return q;
-          }));
+        // If we are currently editing this quiz, update the active quiz ID
+        if (existingQuiz && existingQuiz.id.toString() === activeAddQuestionQuizId.toString()) {
+          setExistingQuiz(prev => ({ ...prev, id: newQuizId }));
+          setQuizIdForQuestion(newQuizId);
         }
 
         setModalQuestionForm({
@@ -472,8 +551,67 @@ const AdminQuizzes = () => {
         });
         setActiveAddQuestionQuizId(null);
         setActiveEditQuestionId(null);
+
+        // Reload existing quizzes list
+        const coursesRes = await fetch(`${BASE_URL}/bsgupadmin/createcourse/`);
+        const coursesData = await coursesRes.json();
+        if (coursesData.success && coursesData.data) {
+          fetchAllExistingQuizzes(coursesData.data);
+        }
       } else {
-        alert(data.error || "Failed to save question.");
+        const res = await fetch(`${BASE_URL}/bsgupadmin/create-question/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (res.ok || data.success) {
+          alert(data.message || data.success || "Question Added Successfully!");
+
+          const refreshed = await fetchQuizById(activeAddQuestionQuizId);
+          if (refreshed) {
+            setAllQuizzes(prev => prev.map(q => {
+              if (q.id.toString() === activeAddQuestionQuizId.toString()) {
+                return { ...q, questions: refreshed.questions };
+              }
+              return q;
+            }));
+          } else {
+            const newQuestionObj = {
+              id: data.data?.question_id || data.question_id || Date.now().toString(),
+              question: modalQuestionForm.question,
+              option1: modalQuestionForm.option1,
+              option2: modalQuestionForm.option2,
+              option3: modalQuestionForm.option3,
+              option4: modalQuestionForm.option4,
+              correct_answer: modalQuestionForm.correct_answer
+            };
+
+            setAllQuizzes(prev => prev.map(q => {
+              if (q.id.toString() === activeAddQuestionQuizId.toString()) {
+                return {
+                  ...q,
+                  questions: [...(q.questions || []), newQuestionObj]
+                };
+              }
+              return q;
+            }));
+          }
+
+          setModalQuestionForm({
+            question: '',
+            option1: '',
+            option2: '',
+            option3: '',
+            option4: '',
+            correct_answer: ''
+          });
+          setActiveAddQuestionQuizId(null);
+          setActiveEditQuestionId(null);
+        } else {
+          alert(data.error || "Failed to save question.");
+        }
       }
     } catch (err) {
       console.error(err);

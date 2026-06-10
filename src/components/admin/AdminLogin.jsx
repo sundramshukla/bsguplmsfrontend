@@ -1,6 +1,26 @@
 import React, { useState } from 'react';
 import { BASE_URL } from '../../config';
 
+const parseJwt = (token) => {
+  try {
+    if (!token) return null;
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error("Failed to parse JWT:", e);
+    return null;
+  }
+};
+
 const AdminLogin = ({ onLoginSuccess }) => {
   const [mobileNumber, setMobileNumber] = useState('');
   const [otpMode, setOtpMode] = useState(false);
@@ -67,9 +87,7 @@ const AdminLogin = ({ onLoginSuccess }) => {
            return null;
         };
 
-        const parseJwt = (t) => {
-           try { return JSON.parse(atob(t.split('.')[1])); } catch (e) { return null; }
-        };
+        
 
         const token = extractToken(data);
         let returnedUserId = null;

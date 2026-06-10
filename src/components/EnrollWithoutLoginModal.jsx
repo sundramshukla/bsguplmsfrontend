@@ -2,6 +2,26 @@ import React, { useState } from 'react';
 import { BASE_URL } from '../config';
 import { processCourseEnrollment, navigateToPaymentResult } from '../utils/paymentUtils';
 
+const parseJwt = (token) => {
+  try {
+    if (!token) return null;
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error("Failed to parse JWT:", e);
+    return null;
+  }
+};
+
 const EnrollWithoutLoginModal = ({ isOpen, onClose, courseId }) => {
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
@@ -68,11 +88,64 @@ const EnrollWithoutLoginModal = ({ isOpen, onClose, courseId }) => {
         const data = await res.json().catch(() => ({}));
         alert('Successfully enrolled!');
 
-        const userId = data.user_id || data.id || localStorage.getItem('userId') || '3';
+        const findUserId = (obj) => {
+          if (!obj || typeof obj !== 'object') return null;
+          const directKeys = ['user_id', 'userId', 'id', 'pk', 'uid', 'student_id', 'studentId'];
+          for (const key of directKeys) {
+            if (obj[key] !== undefined && obj[key] !== null) {
+              const val = parseInt(obj[key], 10);
+              if (!isNaN(val)) return val;
+            }
+          }
+          if (obj.user && typeof obj.user === 'object') return findUserId(obj.user);
+          if (obj.student && typeof obj.student === 'object') return findUserId(obj.student);
+          if (obj.data && typeof obj.data === 'object') return findUserId(obj.data);
+          if (obj.user_details && typeof obj.user_details === 'object') return findUserId(obj.user_details);
+          if (obj.user !== undefined && obj.user !== null) {
+            const val = parseInt(obj.user, 10);
+            if (!isNaN(val)) return val;
+          }
+          return null;
+        };
+
+        const extractToken = (obj) => {
+           if (typeof obj === 'string' && obj.startsWith('eyJ')) return obj;
+           if (typeof obj === 'object' && obj !== null) {
+              if (obj.access && typeof obj.access === 'string') return obj.access;
+              if (obj.token && typeof obj.token === 'string') return obj.token;
+              for (const key in obj) {
+                 if (typeof obj[key] === 'string' && obj[key].startsWith('eyJ')) return obj[key];
+                 if (typeof obj[key] === 'object') {
+                    const nested = extractToken(obj[key]);
+                    if (nested) return nested;
+                 }
+              }
+           }
+           return null;
+        };
+
+        const token = extractToken(data);
+        let extractedUserId = null;
+        if (token) {
+          try {
+            
+            const decoded = parseJwt(token);
+            extractedUserId = findUserId(decoded);
+          } catch (e) {
+            console.error("Failed to decode token in EnrollWithoutLoginModal:", e);
+          }
+        }
+        if (!extractedUserId) {
+          extractedUserId = findUserId(data);
+        }
+
+        const userId = extractedUserId || localStorage.getItem('userId') || '3';
         localStorage.setItem('isLoggedIn', 'true');
         localStorage.setItem('role', 'student');
         localStorage.setItem('userId', userId.toString());
-        if (data.token || data.jwt || data.access) {
+        if (token) {
+          localStorage.setItem('token', token);
+        } else if (data.token || data.jwt || data.access) {
           localStorage.setItem('token', data.token || data.jwt || data.access);
         }
 
