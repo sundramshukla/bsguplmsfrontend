@@ -12,11 +12,13 @@ import Loader from '../Loader';
 const YouTubePlayer = ({ url, title, courseId, partNum, onVideoEnd }) => {
   const playerRef = React.useRef(null);
   const ytPlayerRef = React.useRef(null);
+  const containerRef = React.useRef(null);
   const [playerReady, setPlayerReady] = React.useState(false);
   const [isPlaying, setIsPlaying] = React.useState(false);
   const [currentTime, setCurrentTime] = React.useState(0);
   const [duration, setDuration] = React.useState(0);
   const [showControls, setShowControls] = React.useState(false);
+  const [isFullscreen, setIsFullscreen] = React.useState(false);
   const maxTimeWatchedRef = React.useRef(0);
 
   const userId = localStorage.getItem('userId') || 'guest';
@@ -43,6 +45,69 @@ const YouTubePlayer = ({ url, title, courseId, partNum, onVideoEnd }) => {
     }
     return url;
   }, [url]);
+
+  const toggleFullscreen = (e) => {
+    if (e) e.stopPropagation();
+    const element = containerRef.current;
+    if (!element) return;
+
+    const requestMethod = element.requestFullscreen || 
+                          element.webkitRequestFullscreen || 
+                          element.mozRequestFullScreen || 
+                          element.msRequestFullscreen;
+
+    if (requestMethod) {
+      if (!document.fullscreenElement && 
+          !document.webkitFullscreenElement && 
+          !document.mozFullScreenElement && 
+          !document.msFullscreenElement) {
+        requestMethod.call(element).catch((err) => {
+          console.error("Fullscreen request failed, falling back to pseudo-fullscreen", err);
+          setIsFullscreen(true);
+        });
+      } else {
+        const exitMethod = document.exitFullscreen || 
+                           document.webkitExitFullscreen || 
+                           document.mozCancelFullScreen || 
+                           document.msExitFullscreen;
+        if (exitMethod) {
+          exitMethod.call(document);
+        }
+      }
+    } else {
+      setIsFullscreen(!isFullscreen);
+    }
+  };
+
+  React.useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isNativeFull = !!(document.fullscreenElement || 
+                              document.webkitFullscreenElement || 
+                              document.mozFullScreenElement || 
+                              document.msFullscreenElement);
+      setIsFullscreen(isNativeFull);
+    };
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setIsFullscreen(false);
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   React.useEffect(() => {
     if (!window.YT) {
@@ -181,88 +246,113 @@ const YouTubePlayer = ({ url, title, courseId, partNum, onVideoEnd }) => {
 
   return (
     <div 
-      className="relative w-full aspect-video rounded-xl overflow-hidden bg-slate-950 border border-slate-200 shadow-inner group"
+      ref={containerRef}
+      className={`bg-slate-950 border border-slate-200 shadow-inner overflow-hidden group transition-all duration-200 ${
+        isFullscreen 
+          ? 'fixed inset-0 z-[9999] w-screen h-screen rounded-none border-none flex items-center justify-center' 
+          : 'relative w-full aspect-video rounded-xl'
+      }`}
       onMouseEnter={() => setShowControls(true)}
       onMouseLeave={() => setShowControls(false)}
     >
-      {/* Embedded Iframe Container with crop styling */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {embedUrl ? (
-          <iframe 
-            ref={playerRef}
-            src={embedUrl} 
-            title={title}
-            style={{
-              position: 'absolute',
-              top: '-45px',
-              left: 0,
-              width: '100%',
-              height: 'calc(100% + 90px)',
-              border: 'none',
-              pointerEvents: 'none'
-            }}
-            allow="autoplay; encrypted-media; gyroscope; picture-in-picture"
-            sandbox="allow-scripts allow-same-origin allow-presentation"
-          ></iframe>
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-slate-400 font-semibold">No Video Configured</div>
-        )}
-      </div>
+      {/* Video Content Wrapper to maintain aspect ratio in fullscreen */}
+      <div className={`relative w-full aspect-video ${isFullscreen ? 'max-w-full max-h-full' : 'h-full'}`}>
+        {/* Embedded Iframe Container with crop styling */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {embedUrl ? (
+            <iframe 
+              ref={playerRef}
+              src={embedUrl} 
+              title={title}
+              style={{
+                position: 'absolute',
+                top: '-45px',
+                left: 0,
+                width: '100%',
+                height: 'calc(100% + 90px)',
+                border: 'none',
+                pointerEvents: 'none'
+              }}
+              allow="autoplay; encrypted-media; gyroscope; picture-in-picture"
+              sandbox="allow-scripts allow-same-origin allow-presentation"
+            ></iframe>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-slate-400 font-semibold">No Video Configured</div>
+          )}
+        </div>
 
-      {/* Click overlay to play/pause */}
-      <div 
-        onClick={togglePlay}
-        className="absolute inset-0 cursor-pointer z-10 flex items-center justify-center"
-      >
-        {!isPlaying && playerReady && (
-          <div className="w-16 h-16 bg-black/60 hover:bg-emerald-600/90 text-white rounded-full flex items-center justify-center shadow-lg transition-all transform hover:scale-110 active:scale-95 duration-200">
-            <svg className="w-8 h-8 fill-current ml-1" viewBox="0 0 24 24">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          </div>
-        )}
-      </div>
-
-      {/* Custom Glassmorphic Controls Bar */}
-      {playerReady && (
+        {/* Click overlay to play/pause */}
         <div 
-          className={`absolute bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur-md border-t border-white/10 px-4 py-3 z-20 flex items-center gap-3 transition-opacity duration-300 ${showControls || !isPlaying ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-          onClick={(e) => e.stopPropagation()}
+          onClick={togglePlay}
+          className="absolute inset-0 cursor-pointer z-10 flex items-center justify-center"
         >
-          {/* Play/Pause Button */}
-          <button 
-            onClick={togglePlay}
-            className="text-white hover:text-emerald-400 transition-colors focus:outline-none shrink-0"
-          >
-            {isPlaying ? (
-              <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
-                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-              </svg>
-            ) : (
-              <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+          {!isPlaying && playerReady && (
+            <div className="w-16 h-16 bg-black/60 hover:bg-emerald-600/90 text-white rounded-full flex items-center justify-center shadow-lg transition-all transform hover:scale-110 active:scale-95 duration-200">
+              <svg className="w-8 h-8 fill-current ml-1" viewBox="0 0 24 24">
                 <path d="M8 5v14l11-7z" />
               </svg>
-            )}
-          </button>
-
-          {/* Progress Bar / Scrubber */}
-          <div className="relative flex-grow flex items-center h-2 group/slider">
-            <input 
-              type="range" 
-              min={0} 
-              max={duration || 100} 
-              value={currentTime} 
-              onChange={handleSeek}
-              className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-emerald-500 hover:accent-emerald-400 outline-none"
-            />
-          </div>
-
-          {/* Timer Display */}
-          <span className="text-white text-xs font-mono shrink-0 select-none">
-            {formatTime(currentTime)} / {formatTime(duration)}
-          </span>
+            </div>
+          )}
         </div>
-      )}
+
+        {/* Custom Glassmorphic Controls Bar */}
+        {playerReady && (
+          <div 
+            className={`absolute bottom-0 left-0 right-0 bg-slate-900/80 backdrop-blur-md border-t border-white/10 px-4 py-3 z-20 flex items-center gap-3 transition-opacity duration-300 ${showControls || !isPlaying ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Play/Pause Button */}
+            <button 
+              onClick={togglePlay}
+              className="text-white hover:text-emerald-400 transition-colors focus:outline-none shrink-0"
+            >
+              {isPlaying ? (
+                <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                  <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                </svg>
+              ) : (
+                <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              )}
+            </button>
+
+            {/* Progress Bar / Scrubber */}
+            <div className="relative flex-grow flex items-center h-2 group/slider">
+              <input 
+                type="range" 
+                min={0} 
+                max={duration || 100} 
+                value={currentTime} 
+                onChange={handleSeek}
+                className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-emerald-500 hover:accent-emerald-400 outline-none"
+              />
+            </div>
+
+            {/* Timer Display */}
+            <span className="text-white text-xs font-mono shrink-0 select-none">
+              {formatTime(currentTime)} / {formatTime(duration)}
+            </span>
+
+            {/* Fullscreen Button */}
+            <button 
+              onClick={toggleFullscreen}
+              className="text-white hover:text-emerald-400 transition-colors focus:outline-none shrink-0"
+              title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+            >
+              {isFullscreen ? (
+                <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                  <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z" />
+                </svg>
+              ) : (
+                <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                  <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
+                </svg>
+              )}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
