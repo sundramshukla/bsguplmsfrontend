@@ -370,7 +370,6 @@ const StudentEnrolledCourses = () => {
   const [currentPart, setCurrentPart] = useState(1); // currently active lesson/part index
   const [maxUnlockedPart, setMaxUnlockedPart] = useState(1); // maximum unlocked lesson/part index
   const [activeSubLessonIndex, setActiveSubLessonIndex] = useState(-1); // -1 = main video, otherwise sub-lesson index
-  const [viewMode, setViewMode] = useState('video'); // 'video' or 'notes'
   const [expandedLessons, setExpandedLessons] = useState({ 1: true });
   const [quizStarted, setQuizStarted] = useState(false);
   const [quizLoading, setQuizLoading] = useState(false);
@@ -890,7 +889,6 @@ const StudentEnrolledCourses = () => {
 
       fetchProgress();
       setActiveSubLessonIndex(-1);
-      setViewMode('video');
       setQuizStarted(false);
       setQuizData(null);
       setQuizResult(null);
@@ -1190,7 +1188,6 @@ const StudentEnrolledCourses = () => {
       if (lesson.sub_lessons && activeSubLessonIndex < lesson.sub_lessons.length - 1) {
         // Go to next sub-lesson
         setActiveSubLessonIndex(activeSubLessonIndex + 1);
-        setViewMode('video');
         return;
       }
     }
@@ -1208,7 +1205,6 @@ const StudentEnrolledCourses = () => {
       }
       setCurrentPart(nextPartNum);
       setActiveSubLessonIndex(-1); // Reset to main lesson video
-      setViewMode('video');
       
       // Auto-expand the newly unlocked lesson dropdown
       setExpandedLessons(prev => ({
@@ -1235,7 +1231,6 @@ const StudentEnrolledCourses = () => {
     setCurrentPart(1);
     setMaxUnlockedPart(1);
     setActiveSubLessonIndex(-1);
-    setViewMode('video');
     setExpandedLessons({ 1: true });
     setQuizStarted(false);
     setQuizResult(null);
@@ -1445,7 +1440,6 @@ const StudentEnrolledCourses = () => {
                         if (!isExpanded) {
                           setCurrentPart(num);
                           setActiveSubLessonIndex(-1);
-                          setViewMode('video');
                         }
                         setExpandedLessons(prev => ({
                           ...prev,
@@ -1500,55 +1494,20 @@ const StudentEnrolledCourses = () => {
 
                         {currentPart === num && (
                           <div className="space-y-4">
-                            {/* Mode Toggles */}
-                            <div className="flex bg-slate-200/60 p-1 rounded-xl w-fit">
-                              <button
-                                onClick={() => setViewMode('video')}
-                                className={`px-5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
-                                  viewMode === 'video'
-                                    ? 'bg-white text-emerald-700 shadow-sm'
-                                    : 'text-slate-600 hover:text-slate-900'
-                                }`}
-                              >
-                                <span>🎥</span> Video
-                              </button>
-                              <button
-                                onClick={() => setViewMode('notes')}
-                                className={`px-5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
-                                  viewMode === 'notes'
-                                    ? 'bg-white text-emerald-700 shadow-sm'
-                                    : 'text-slate-600 hover:text-slate-900'
-                                }`}
-                              >
-                                <span>📄</span> Study Notes
-                              </button>
-                            </div>
-
                             {/* Content */}
-                            {viewMode === 'video' ? (
-                              <div className="space-y-4 animate-fadeIn">
-                                <YouTubePlayer 
-                                  url={activeVideoUrl} 
-                                  title={activeTitle}
-                                  courseId={activeCourse.id}
-                                  partNum={activePartId}
-                                  onVideoEnd={handleNextPart}
-                                />
-                                <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-                                  <h4 className="text-sm font-bold text-slate-800 mb-2">About this video</h4>
-                                  <p className="text-slate-600 text-sm leading-relaxed">{activeDescription}</p>
-                                </div>
+                            <div className="space-y-4 animate-fadeIn">
+                              <YouTubePlayer 
+                                url={activeVideoUrl} 
+                                title={activeTitle}
+                                courseId={activeCourse.id}
+                                partNum={activePartId}
+                                onVideoEnd={handleNextPart}
+                              />
+                              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+                                <h4 className="text-sm font-bold text-slate-800 mb-2">About this video</h4>
+                                <p className="text-slate-600 text-sm leading-relaxed">{activeDescription}</p>
                               </div>
-                            ) : (
-                              <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm animate-fadeIn">
-                                <h4 className="text-lg font-bold text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-3 mb-4">
-                                  <span>📚</span> Syllabus Material & Reference Notes
-                                </h4>
-                                <p className="text-slate-700 text-sm whitespace-pre-wrap leading-relaxed font-serif">
-                                  {activeDescription}
-                                </p>
-                              </div>
-                            )}
+                            </div>
                           </div>
                         )}
                       </div>
