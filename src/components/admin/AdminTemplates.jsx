@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { BASE_URL } from '../../config';
 
 const AdminTemplates = () => {
-  const [department, setDepartment] = useState('training');
+  const [courses, setCourses] = useState([]);
+  const [selectedCourseId, setSelectedCourseId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [bgImageFile, setBgImageFile] = useState(null);
   
@@ -17,12 +18,34 @@ const AdminTemplates = () => {
     sigRightTitle: 'State Secretary',
     sigRightSub: 'BSGUP Lucknow',
     textColor: '#1e293b',
-    bgImageBase64: '' // For local rendering
+    bgImageBase64: '', // For local rendering
+    sigLeftImageBase64: '',
+    sigRightImageBase64: ''
   });
 
-  // Load existing configuration for selected department
+  // Fetch list of courses on mount
   useEffect(() => {
-    const cachedConfig = localStorage.getItem(`certificate_template_${department}`);
+    const fetchCourses = async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/bsgupadmin/createcourse/`);
+        const data = await res.json();
+        if (data.success && data.data) {
+          setCourses(data.data);
+          if (data.data.length > 0) {
+            setSelectedCourseId(data.data[0].id.toString());
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch courses", err);
+      }
+    };
+    fetchCourses();
+  }, []);
+
+  // Load existing configuration for selected course
+  useEffect(() => {
+    if (!selectedCourseId) return;
+    const cachedConfig = localStorage.getItem(`certificate_template_${selectedCourseId}`);
     if (cachedConfig) {
       try {
         const parsed = JSON.parse(cachedConfig);
@@ -36,7 +59,9 @@ const AdminTemplates = () => {
           sigRightTitle: parsed.sigRightTitle || 'State Secretary',
           sigRightSub: parsed.sigRightSub || 'BSGUP Lucknow',
           textColor: parsed.textColor || '#1e293b',
-          bgImageBase64: parsed.bgImageBase64 || ''
+          bgImageBase64: parsed.bgImageBase64 || '',
+          sigLeftImageBase64: parsed.sigLeftImageBase64 || '',
+          sigRightImageBase64: parsed.sigRightImageBase64 || ''
         });
       } catch (err) {
         console.error("Failed to parse cached template config", err);
@@ -53,11 +78,13 @@ const AdminTemplates = () => {
         sigRightTitle: 'State Secretary',
         sigRightSub: 'BSGUP Lucknow',
         textColor: '#1e293b',
-        bgImageBase64: ''
+        bgImageBase64: '',
+        sigLeftImageBase64: '',
+        sigRightImageBase64: ''
       });
     }
     setBgImageFile(null);
-  }, [department]);
+  }, [selectedCourseId]);
 
   const handleChange = (e) => {
     setConfig({ ...config, [e.target.name]: e.target.value });
@@ -82,16 +109,94 @@ const AdminTemplates = () => {
     setConfig(prev => ({ ...prev, bgImageBase64: '' }));
   };
 
+  // Canvas Signature Compressor (Preserves PNG transparency)
+  const compressSignature = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const MAX_SIZE = 400;
+
+          if (width > MAX_SIZE || height > MAX_SIZE) {
+            if (width > height) {
+              height = Math.round((height * MAX_SIZE) / width);
+              width = MAX_SIZE;
+            } else {
+              width = Math.round((width * MAX_SIZE) / height);
+              height = MAX_SIZE;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Use PNG to preserve transparency for signatures
+          const base64 = canvas.toDataURL('image/png');
+          resolve(base64);
+        };
+        img.onerror = (err) => reject(err);
+        img.src = e.target.result;
+      };
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleLeftSigChange = async (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      try {
+        const compressed = await compressSignature(file);
+        setConfig(prev => ({ ...prev, sigLeftImageBase64: compressed }));
+      } catch (err) {
+        console.error("Failed to compress left signature", err);
+        alert("Failed to process left signature image");
+      }
+    }
+  };
+
+  const handleRightSigChange = async (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      try {
+        const compressed = await compressSignature(file);
+        setConfig(prev => ({ ...prev, sigRightImageBase64: compressed }));
+      } catch (err) {
+        console.error("Failed to compress right signature", err);
+        alert("Failed to process right signature image");
+      }
+    }
+  };
+
+  const handleResetLeftSig = () => {
+    setConfig(prev => ({ ...prev, sigLeftImageBase64: '' }));
+  };
+
+  const handleResetRightSig = () => {
+    setConfig(prev => ({ ...prev, sigRightImageBase64: '' }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!selectedCourseId) {
+      alert("Please select a target course first!");
+      return;
+    }
     setIsLoading(true);
     try {
       // 1. Save to Local Storage for instant frontend update
-      localStorage.setItem(`certificate_template_${department}`, JSON.stringify(config));
+      localStorage.setItem(`certificate_template_${selectedCourseId}`, JSON.stringify(config));
 
       // 2. Prepare FormData for Backend upload (behaves correctly with "backend se likh ke chali jaye")
       const fd = new FormData();
-      fd.append('department', department);
+      fd.append('course_id', selectedCourseId);
       fd.append('title', config.title);
       fd.append('sub_header', config.subHeader);
       fd.append('certification_text', config.certificationText);
@@ -114,7 +219,7 @@ const AdminTemplates = () => {
 
       const data = await res.json();
       if (res.ok || data.success) {
-        alert(data.success || data.message || `Certificate Template for ${department.toUpperCase()} saved successfully!`);
+        alert(data.success || data.message || `Certificate Template saved successfully!`);
       } else {
         // Fallback alert because it's locally saved perfectly in localStorage anyway!
         alert(`Saved successfully to local storage! (Backend sync fallback: ${data.error || 'Server responded with code ' + res.status})`);
@@ -132,7 +237,7 @@ const AdminTemplates = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <h2 className="text-3xl font-extrabold text-slate-800">Manage Certificate Templates</h2>
-          <p className="text-slate-500 text-sm mt-1">Configure background templates and text configurations for each department.</p>
+          <p className="text-slate-500 text-sm mt-1">Configure background templates and text configurations for each course.</p>
         </div>
       </div>
 
@@ -141,17 +246,23 @@ const AdminTemplates = () => {
         <div className="lg:col-span-5 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             
-            {/* Department Select */}
+            {/* Course Select */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Target Department</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">Target Course</label>
               <select
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
+                value={selectedCourseId}
+                onChange={(e) => setSelectedCourseId(e.target.value)}
                 className="w-full border-2 border-slate-200 p-2.5 rounded-lg font-medium text-slate-700 focus:border-[#7c3aed] focus:outline-none"
               >
-                <option value="training">Training Department</option>
-                <option value="organisation">Organization Department</option>
-                <option value="it">IT Department</option>
+                {courses.length === 0 ? (
+                  <option value="">Loading courses...</option>
+                ) : (
+                  courses.map(c => (
+                    <option key={c.id} value={c.id.toString()}>
+                      {c.title}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
 
@@ -278,6 +389,50 @@ const AdminTemplates = () => {
               </div>
             </div>
 
+            {/* Customize Signature Images */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Left Signature Image</label>
+                <div className="flex flex-col gap-1">
+                  <input
+                    type="file"
+                    onChange={handleLeftSigChange}
+                    accept="image/*"
+                    className="w-full border border-slate-300 p-1.5 rounded text-xs text-slate-600 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-violet-50 file:text-[#7c3aed] hover:file:bg-violet-100 cursor-pointer"
+                  />
+                  {config.sigLeftImageBase64 && (
+                    <button
+                      type="button"
+                      onClick={handleResetLeftSig}
+                      className="text-[10px] text-rose-500 font-bold hover:underline self-start flex items-center gap-0.5"
+                    >
+                      ❌ Remove Left Signature
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Right Signature Image</label>
+                <div className="flex flex-col gap-1">
+                  <input
+                    type="file"
+                    onChange={handleRightSigChange}
+                    accept="image/*"
+                    className="w-full border border-slate-300 p-1.5 rounded text-xs text-slate-600 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-violet-50 file:text-[#7c3aed] hover:file:bg-violet-100 cursor-pointer"
+                  />
+                  {config.sigRightImageBase64 && (
+                    <button
+                      type="button"
+                      onClick={handleResetRightSig}
+                      className="text-[10px] text-rose-500 font-bold hover:underline self-start flex items-center gap-0.5"
+                    >
+                      ❌ Remove Right Signature
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Custom Styling */}
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1">Text Color</label>
@@ -298,7 +453,7 @@ const AdminTemplates = () => {
               disabled={isLoading}
               className="w-full bg-[#7c3aed] hover:bg-[#6d28d9] text-white font-bold py-3 rounded-xl transition-all disabled:opacity-50 mt-4 shadow-md shadow-violet-500/20"
             >
-              {isLoading ? 'Saving Template...' : `Save ${department.toUpperCase()} Template`}
+              {isLoading ? 'Saving Template...' : `Save Course Template`}
             </button>
           </form>
         </div>
@@ -352,22 +507,32 @@ const AdminTemplates = () => {
                 </div>
 
                 {/* Signatures */}
-                <div className="grid grid-cols-2 gap-4 border-t border-slate-200/50 pt-4 max-w-xs mx-auto">
-                  <div className="text-center">
-                    <div className="font-serif italic font-semibold text-[10px] mb-0.5" style={{ color: config.textColor }}>
+                <div className="grid grid-cols-2 gap-4 border-t border-slate-200/50 pt-2.5 max-w-xs mx-auto">
+                  <div className="text-center flex flex-col justify-end min-h-[50px]">
+                    {config.sigLeftImageBase64 && (
+                      <div className="h-8 flex items-end justify-center mb-0.5">
+                        <img src={config.sigLeftImageBase64} alt="Left Signature" className="max-h-full object-contain" />
+                      </div>
+                    )}
+                    <div className="w-16 h-0.5 bg-slate-300 mx-auto"></div>
+                    <div className="font-serif italic font-semibold text-[9px] mt-0.5 mb-0.5" style={{ color: config.textColor }}>
                       {config.sigLeftTitle}
                     </div>
-                    <div className="w-16 h-0.5 bg-slate-300 mx-auto"></div>
-                    <div className="text-[8px] text-slate-400 mt-0.5 font-bold">
+                    <div className="text-[7px] text-slate-400 font-bold">
                       {config.sigLeftSub}
                     </div>
                   </div>
-                  <div className="text-center">
-                    <div className="font-serif italic font-semibold text-[10px] mb-0.5" style={{ color: config.textColor }}>
+                  <div className="text-center flex flex-col justify-end min-h-[50px]">
+                    {config.sigRightImageBase64 && (
+                      <div className="h-8 flex items-end justify-center mb-0.5">
+                        <img src={config.sigRightImageBase64} alt="Right Signature" className="max-h-full object-contain" />
+                      </div>
+                    )}
+                    <div className="w-16 h-0.5 bg-slate-300 mx-auto"></div>
+                    <div className="font-serif italic font-semibold text-[9px] mt-0.5 mb-0.5" style={{ color: config.textColor }}>
                       {config.sigRightTitle}
                     </div>
-                    <div className="w-16 h-0.5 bg-slate-300 mx-auto"></div>
-                    <div className="text-[8px] text-slate-400 mt-0.5 font-bold">
+                    <div className="text-[7px] text-slate-400 font-bold">
                       {config.sigRightSub}
                     </div>
                   </div>

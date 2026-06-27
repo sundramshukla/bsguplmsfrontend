@@ -8,6 +8,7 @@ import AdminTemplates from './AdminTemplates';
 import AdminEnrolledStudents from './AdminEnrolledStudents';
 import AdminPaymentHistory from './AdminPaymentHistory';
 import AdminRegisteredStudents from './AdminRegisteredStudents';
+import AdminSlider from './AdminSlider';
 
 const AdminDashboard = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState('analytics');
@@ -120,6 +121,12 @@ const AdminDashboard = ({ onLogout }) => {
           >
             <span>📜</span> Certificate Templates
           </button>
+          <button 
+            onClick={() => handleTabClick('slider')}
+             className={`w-full text-left px-5 py-4 rounded-xl font-semibold transition-all duration-200 flex items-center gap-3 ${activeTab === 'slider' ? 'bg-[#7c3aed] text-white shadow-lg shadow-violet-500/30 translate-x-1' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+          >
+            <span>🖼️</span> Manage Slider
+          </button>
         </div>
 
         <div className="p-6 border-t border-slate-700/50 bg-slate-900/30 mt-auto hidden md:block">
@@ -141,6 +148,7 @@ const AdminDashboard = ({ onLogout }) => {
             {activeTab === 'enrolled_students' && <AdminEnrolledStudents />}
             {activeTab === 'registered_students' && <AdminRegisteredStudents />}
             {activeTab === 'payment_history' && <AdminPaymentHistory />}
+            {activeTab === 'slider' && <AdminSlider />}
         </div>
       </div>
     </div>

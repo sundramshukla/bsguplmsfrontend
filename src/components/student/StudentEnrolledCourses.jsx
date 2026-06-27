@@ -386,8 +386,9 @@ const StudentEnrolledCourses = () => {
   const [showCertificate, setShowCertificate] = useState(false);
 
   const handlePrintCertificate = () => {
+    const courseId = activeCourse.id ? activeCourse.id.toString() : '';
     const dept = (activeCourse.department || 'training').toLowerCase();
-    const customTemplateStr = localStorage.getItem(`certificate_template_${dept}`);
+    const customTemplateStr = localStorage.getItem(`certificate_template_${courseId}`) || localStorage.getItem(`certificate_template_${dept}`);
     let template = {
       title: 'THE BHARAT SCOUTS & GUIDES',
       subHeader: 'Uttar Pradesh State Headquarters',
@@ -398,7 +399,9 @@ const StudentEnrolledCourses = () => {
       sigRightTitle: 'State Secretary',
       sigRightSub: 'BSGUP Lucknow',
       textColor: '#1e293b',
-      bgImageBase64: ''
+      bgImageBase64: '',
+      sigLeftImageBase64: '',
+      sigRightImageBase64: ''
     };
     if (customTemplateStr) {
       try {
@@ -510,6 +513,18 @@ const StudentEnrolledCourses = () => {
               border-top: 1px solid #e2e8f0;
               padding-top: 20px;
             }
+            .signature-img-container {
+              height: 40px;
+              display: flex;
+              align-items: end;
+              justify-content: center;
+              margin-bottom: 4px;
+            }
+            .signature-img {
+              max-height: 100%;
+              max-width: 120px;
+              object-fit: contain;
+            }
             .signature-title {
               font-size: 13px;
               font-style: italic;
@@ -541,14 +556,16 @@ const StudentEnrolledCourses = () => {
               <div class="desc">${template.descriptionText}</div>
               <div class="course-title">${activeCourse.title}</div>
               <div class="signatures">
-                <div>
-                  <div class="signature-title">${template.sigLeftTitle}</div>
+                <div style="display: flex; flex-direction: column; justify-content: flex-end; min-height: 70px;">
+                  ${template.sigLeftImageBase64 ? '<div class="signature-img-container"><img class="signature-img" src="' + template.sigLeftImageBase64 + '" alt="Left Signature" /></div>' : '<div class="signature-img-container"></div>'}
                   <div class="signature-line"></div>
+                  <div class="signature-title">${template.sigLeftTitle}</div>
                   <div class="signature-subtitle">${template.sigLeftSub}</div>
                 </div>
-                <div>
-                  <div class="signature-title">${template.sigRightTitle}</div>
+                <div style="display: flex; flex-direction: column; justify-content: flex-end; min-height: 70px;">
+                  ${template.sigRightImageBase64 ? '<div class="signature-img-container"><img class="signature-img" src="' + template.sigRightImageBase64 + '" alt="Right Signature" /></div>' : '<div class="signature-img-container"></div>'}
                   <div class="signature-line"></div>
+                  <div class="signature-title">${template.sigRightTitle}</div>
                   <div class="signature-subtitle">${template.sigRightSub}</div>
                 </div>
               </div>
@@ -1669,8 +1686,9 @@ const StudentEnrolledCourses = () => {
 
         {/* Certificate Modal */}
         {showCertificate && (() => {
+          const courseId = activeCourse.id ? activeCourse.id.toString() : '';
           const dept = (activeCourse.department || 'training').toLowerCase();
-          const customTemplateStr = localStorage.getItem(`certificate_template_${dept}`);
+          const customTemplateStr = localStorage.getItem(`certificate_template_${courseId}`) || localStorage.getItem(`certificate_template_${dept}`);
           let template = {
             title: 'THE BHARAT SCOUTS & GUIDES',
             subHeader: 'Uttar Pradesh State Headquarters',
@@ -1738,21 +1756,31 @@ const StudentEnrolledCourses = () => {
                   </h3>
                   
                   <div className="grid grid-cols-2 gap-4 border-t border-slate-200 pt-4 md:pt-6 max-w-md mx-auto">
-                    <div className="text-center">
-                      <div className="font-serif italic font-semibold text-[10px] md:text-xs mb-1" style={{ color: template.textColor }}>
+                    <div className="text-center flex flex-col justify-end min-h-[60px]">
+                      {template.sigLeftImageBase64 && (
+                        <div className="h-8 md:h-12 flex items-end justify-center mb-1">
+                          <img src={template.sigLeftImageBase64} alt="Left Signature" className="max-h-full object-contain" />
+                        </div>
+                      )}
+                      <div className="w-16 md:w-24 h-0.5 bg-slate-300 mx-auto"></div>
+                      <div className="font-serif italic font-semibold text-[10px] md:text-xs mt-1 mb-1" style={{ color: template.textColor }}>
                         {template.sigLeftTitle}
                       </div>
-                      <div className="w-16 md:w-24 h-0.5 bg-slate-300 mx-auto"></div>
-                      <div className="text-[8px] md:text-[10px] text-slate-400 mt-1 font-bold">
+                      <div className="text-[8px] md:text-[10px] text-slate-400 font-bold">
                         {template.sigLeftSub}
                       </div>
                     </div>
-                    <div className="text-center">
-                      <div className="font-serif italic font-semibold text-[10px] md:text-xs mb-1" style={{ color: template.textColor }}>
+                    <div className="text-center flex flex-col justify-end min-h-[60px]">
+                      {template.sigRightImageBase64 && (
+                        <div className="h-8 md:h-12 flex items-end justify-center mb-1">
+                          <img src={template.sigRightImageBase64} alt="Right Signature" className="max-h-full object-contain" />
+                        </div>
+                      )}
+                      <div className="w-16 md:w-24 h-0.5 bg-slate-300 mx-auto"></div>
+                      <div className="font-serif italic font-semibold text-[10px] md:text-xs mt-1 mb-1" style={{ color: template.textColor }}>
                         {template.sigRightTitle}
                       </div>
-                      <div className="w-16 md:w-24 h-0.5 bg-slate-300 mx-auto"></div>
-                      <div className="text-[8px] md:text-[10px] text-slate-400 mt-1 font-bold">
+                      <div className="text-[8px] md:text-[10px] text-slate-400 font-bold">
                         {template.sigRightSub}
                       </div>
                     </div>

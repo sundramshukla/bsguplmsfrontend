@@ -76,12 +76,38 @@
   .hero {
     position: relative;
     height: 90vh;
-    background: url("../assets/Images/Scout_heropage.jpeg")
-      center/cover no-repeat;
     display: flex;
     align-items: center;
     color: white;
     text-align: center;
+    overflow: hidden;
+  }
+  
+  .hero-slider {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+  }
+  
+  .hero-slide {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    transition: opacity 1000ms ease-in-out;
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
+  }
+  
+  .hero-slide.active {
+    opacity: 1;
+    z-index: 1;
   }
   
   .hero-overlay {
@@ -89,12 +115,82 @@
     width: 100%;
     height: 100%;
     background: rgba(20, 20, 40, 0.7);
+    z-index: 2;
   }
   
   .hero-content {
     position: relative;
-    z-index: 2;
+    z-index: 3;
   }
+  
+  /* Slider Controls */
+  .hero-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: white;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 10;
+    opacity: 0.8;
+    pointer-events: auto;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  
+  .hero-arrow:hover {
+    background: #7c3aed;
+    border-color: #a78bfa;
+    transform: translateY(-50%) scale(1.1);
+    box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4);
+  }
+  
+  .hero-arrow.prev {
+    left: 24px;
+  }
+  
+  .hero-arrow.next {
+    right: 24px;
+  }
+  
+  .hero-dots {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    z-index: 10;
+  }
+  
+  .hero-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.35);
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  
+  .hero-dot:hover {
+    background: rgba(255, 255, 255, 0.7);
+  }
+  
+  .hero-dot.active {
+    background: #7c3aed;
+    width: 28px;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(124, 58, 237, 0.5);
+  }
+
   
   .tagline {
     color: #a78bfa;
