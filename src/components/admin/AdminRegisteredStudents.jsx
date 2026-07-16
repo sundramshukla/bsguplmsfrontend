@@ -18,35 +18,34 @@ const AdminRegisteredStudents = () => {
         const adminId = getAdminUserId();
         const dashboard = await fetchAdminDashboard(adminId);
 
-        // We scan UIDs 1 to 200 to find all active profiles.
-        const scanIds = Array.from({ length: 200 }, (_, i) => i + 1);
-        const results = await Promise.all(
-          scanIds.map(async (id) => {
-            try {
-              const res = await fetch(`${BASE_URL}/bsgupadmin/profile/?user_id=${id}`);
-              if (!res.ok) return null;
-              const data = await res.json();
-              
-              let profileObj = null;
-              if (data && data.data && data.data.id) {
-                profileObj = data.data;
-              } else if (data && data.id) {
-                profileObj = data;
-              }
-              return profileObj;
-            } catch (e) {
-              return null;
-            }
-          })
-        );
+        // Fetch registered students list from endpoint
+        const res = await fetch(`${BASE_URL}/bsgupadmin/registered-students-list/?admin_id=${adminId}`);
+        if (!res.ok) throw new Error('Failed to fetch registered students');
+        const data = await res.json();
 
-        const activeProfiles = results.filter(Boolean);
+        let studentList = [];
+        if (data && data.success && Array.isArray(data.data)) {
+          studentList = data.data;
+        } else if (Array.isArray(data)) {
+          studentList = data;
+        } else if (data && Array.isArray(data.students)) {
+          studentList = data.students;
+        } else if (data && Array.isArray(data.data)) {
+          studentList = data.data;
+        }
+
+        const normalizedStudents = studentList.map(s => ({
+          ...s,
+          user: s.user || s.user_id || s.id,
+          id: s.id || s.user_id || s.user
+        }));
+
         // Sort by ID descending (newest first)
-        activeProfiles.sort((a, b) => b.id - a.id);
-        setStudents(activeProfiles);
+        normalizedStudents.sort((a, b) => b.id - a.id);
+        setStudents(normalizedStudents);
 
         // Fetch statuses in parallel for listed profiles
-        const profileUserIds = activeProfiles.map(p => p.user).filter(Boolean);
+        const profileUserIds = normalizedStudents.map(p => p.user).filter(Boolean);
         const statusMap = {};
         await Promise.all(
           profileUserIds.map(async (uid) => {

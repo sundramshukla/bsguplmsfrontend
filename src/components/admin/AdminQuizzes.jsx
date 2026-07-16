@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { BASE_URL } from '../../config';
-import { fetchQuizForCourse, fetchQuizById, saveCourseQuizMapping, syncCourseQuizMappings } from '../../utils/quizUtils';
+import { fetchQuizForCourse, fetchQuizForLesson, fetchQuizById, saveCourseQuizMapping, syncCourseQuizMappings } from '../../utils/quizUtils';
 
 const AdminQuizzes = () => {
   const [courses, setCourses] = useState([]);
   const [selectedCourseId, setSelectedCourseId] = useState('');
+  const [lessons, setLessons] = useState([]);
+  const [selectedLessonId, setSelectedLessonId] = useState('');
+  const [lessonsLoading, setLessonsLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [existingQuiz, setExistingQuiz] = useState(null);
   const [checkingQuiz, setCheckingQuiz] = useState(false);
@@ -12,9 +15,12 @@ const AdminQuizzes = () => {
   // Quiz Form states
   const [quizForm, setQuizForm] = useState({
     title: 'Python Final Quiz',
-    total_marks: 100,
-    passing_marks: 60,
-    duration: 30
+    total_questions: 10,
+    marks_per_question: 2,
+    passing_marks: 12,
+    duration: 30,
+    is_final: true,
+    is_active: true
   });
 
   // Question Form states
@@ -43,31 +49,47 @@ const AdminQuizzes = () => {
     try {
       const promises = coursesList.map(async (course) => {
         try {
-          const quizResult = await fetchQuizForCourse(course.id, course.title);
-          if (!quizResult) return null;
-
-          const qId = quizResult.quizId || localStorage.getItem(`quiz_id_course_${course.id}`);
-          if (!qId) return null;
-
-          return {
-            id: qId.toString(),
-            courseId: course.id.toString(),
-            title: quizResult.title || `Quiz #${qId}`,
-            courseTitle: course.title,
-            total_marks: 100,
-            passing_marks: quizResult.passing_marks || 60,
-            duration: quizResult.duration || 30,
-            questions: quizResult.questions || []
-          };
+          const lessonsRes = await fetch(`${BASE_URL}/bsgupadmin/create-lesson/?course_id=${course.id}`);
+          const lessonsData = await lessonsRes.json();
+          if (lessonsData.success && Array.isArray(lessonsData.data)) {
+            const quizPromises = lessonsData.data.map(async (lesson) => {
+              try {
+                const quizResult = await fetchQuizForLesson(lesson.id);
+                if (quizResult && quizResult.quizId) {
+                  return {
+                    id: quizResult.quizId.toString(),
+                    lessonId: lesson.id.toString(),
+                    lessonTitle: lesson.title,
+                    courseId: course.id.toString(),
+                    title: quizResult.title || `Quiz #${quizResult.quizId}`,
+                    courseTitle: course.title,
+                    total_questions: quizResult.total_questions || 10,
+                    marks_per_question: quizResult.marks_per_question || 2,
+                    total_marks: quizResult.total_marks || ((quizResult.total_questions || 10) * (quizResult.marks_per_question || 2)),
+                    passing_marks: quizResult.passing_marks || 12,
+                    duration: quizResult.duration || 30,
+                    is_final: quizResult.is_final !== false,
+                    is_active: quizResult.is_active !== false,
+                    questions: quizResult.questions || []
+                  };
+                }
+              } catch (e) {
+                // Ignore
+              }
+              return null;
+            });
+            const quizResults = await Promise.all(quizPromises);
+            return quizResults.filter(Boolean);
+          }
         } catch (e) {
           // Ignore
         }
-        return null;
+        return [];
       });
 
       const results = await Promise.all(promises);
-      results.forEach(q => {
-        if (q) quizzesFound.push(q);
+      results.forEach(list => {
+        quizzesFound.push(...list);
       });
     } catch (err) {
       console.error("Error fetching all quizzes:", err);
@@ -96,30 +118,38 @@ const AdminQuizzes = () => {
     fetchCourses();
   }, []);
 
-  const checkQuizForCourse = async (courseId) => {
+  const checkQuizForLesson = async (lessonId) => {
+    if (!lessonId) {
+      setExistingQuiz(null);
+      return;
+    }
     setCheckingQuiz(true);
     setExistingQuiz(null);
     try {
-      const quizResult = await fetchQuizForCourse(courseId, courses.find(c => c.id.toString() === courseId.toString())?.title || '');
+      const quizResult = await fetchQuizForLesson(lessonId);
 
-      if (quizResult) {
-        const qId = quizResult.quizId || localStorage.getItem(`quiz_id_course_${courseId}`);
+      if (quizResult && quizResult.quizId) {
         const foundQuiz = {
-          id: qId.toString(),
-          title: quizResult.title || 'Course Final Quiz',
-          total_marks: 100,
-          passing_marks: quizResult.passing_marks || 60,
-          duration: quizResult.duration || 30
+          id: quizResult.quizId.toString(),
+          title: quizResult.title || 'Lesson Quiz',
+          total_questions: quizResult.total_questions || 10,
+          marks_per_question: quizResult.marks_per_question || 2,
+          passing_marks: quizResult.passing_marks || 12,
+          duration: quizResult.duration || 30,
+          is_final: quizResult.is_final !== false,
+          is_active: quizResult.is_active !== false
         };
         setExistingQuiz(foundQuiz);
         setQuizForm({
           title: foundQuiz.title,
-          total_marks: foundQuiz.total_marks,
+          total_questions: foundQuiz.total_questions,
+          marks_per_question: foundQuiz.marks_per_question,
           passing_marks: foundQuiz.passing_marks,
-          duration: foundQuiz.duration
+          duration: foundQuiz.duration,
+          is_final: foundQuiz.is_final,
+          is_active: foundQuiz.is_active
         });
-        setQuizIdForQuestion(qId.toString());
-        saveCourseQuizMapping(courseId, qId);
+        setQuizIdForQuestion(foundQuiz.id);
         setCheckingQuiz(false);
         return;
       }
@@ -128,36 +158,60 @@ const AdminQuizzes = () => {
     }
 
     // Default values if no existing quiz found
-    const courseTitle = courses.find(c => c.id.toString() === courseId.toString())?.title || 'Course';
+    const lessonTitle = lessons.find(l => l.id.toString() === lessonId.toString())?.title || 'Lesson';
     setQuizForm({
-      title: `${courseTitle} Final Quiz`,
-      total_marks: 100,
-      passing_marks: 60,
-      duration: 30
+      title: `${lessonTitle} Quiz`,
+      total_questions: 10,
+      marks_per_question: 2,
+      passing_marks: 12,
+      duration: 30,
+      is_final: true,
+      is_active: true
     });
-
-    const cachedQuizId = localStorage.getItem(`quiz_id_course_${courseId}`);
-    if (cachedQuizId) {
-      setExistingQuiz({
-        id: cachedQuizId,
-        title: `Quiz #${cachedQuizId}`,
-        total_marks: 100,
-        passing_marks: 60,
-        duration: 30
-      });
-      setQuizIdForQuestion(cachedQuizId.toString());
-      saveCourseQuizMapping(courseId, cachedQuizId);
-    } else {
-      setQuizIdForQuestion('');
-    }
+    setQuizIdForQuestion('');
     setCheckingQuiz(false);
   };
 
   useEffect(() => {
     if (selectedCourseId) {
-      checkQuizForCourse(selectedCourseId);
+      const fetchLessonsForCourse = async () => {
+        setLessonsLoading(true);
+        try {
+          const res = await fetch(`${BASE_URL}/bsgupadmin/create-lesson/?course_id=${selectedCourseId}`);
+          const data = await res.json();
+          if (data.success && Array.isArray(data.data)) {
+            setLessons(data.data);
+            if (data.data.length > 0) {
+              setSelectedLessonId(data.data[0].id.toString());
+            } else {
+              setSelectedLessonId('');
+            }
+          } else {
+            setLessons([]);
+            setSelectedLessonId('');
+          }
+        } catch (err) {
+          console.error('Failed to fetch lessons:', err);
+          setLessons([]);
+          setSelectedLessonId('');
+        } finally {
+          setLessonsLoading(false);
+        }
+      };
+      fetchLessonsForCourse();
+    } else {
+      setLessons([]);
+      setSelectedLessonId('');
     }
   }, [selectedCourseId]);
+
+  useEffect(() => {
+    if (selectedLessonId) {
+      checkQuizForLesson(selectedLessonId);
+    } else {
+      setExistingQuiz(null);
+    }
+  }, [selectedLessonId]);
 
   const handleQuizChange = (e) => {
     setQuizForm({ ...quizForm, [e.target.name]: e.target.value });
@@ -172,18 +226,27 @@ const AdminQuizzes = () => {
         setSelectedCourseId(foundCourse.id.toString());
       }
     }
+    if (quiz.lessonId) {
+      setSelectedLessonId(quiz.lessonId);
+    }
     setQuizForm({
       title: quiz.title,
-      total_marks: quiz.total_marks,
+      total_questions: quiz.total_questions || 10,
+      marks_per_question: quiz.marks_per_question || 2,
       passing_marks: quiz.passing_marks,
-      duration: quiz.duration
+      duration: quiz.duration,
+      is_final: quiz.is_final !== false,
+      is_active: quiz.is_active !== false
     });
     setExistingQuiz({
       id: quiz.id,
       title: quiz.title,
-      total_marks: quiz.total_marks,
+      total_questions: quiz.total_questions || 10,
+      marks_per_question: quiz.marks_per_question || 2,
       passing_marks: quiz.passing_marks,
-      duration: quiz.duration
+      duration: quiz.duration,
+      is_final: quiz.is_final !== false,
+      is_active: quiz.is_active !== false
     });
     setQuizIdForQuestion(quiz.id.toString());
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -195,17 +258,24 @@ const AdminQuizzes = () => {
 
   const handleCreateQuiz = async (e) => {
     e.preventDefault();
+    if (!selectedLessonId) {
+      alert("Please select a target lesson before saving the quiz.");
+      return;
+    }
     setIsLoading(true);
     const isEditing = !!existingQuiz;
     try {
       const adminUserId = localStorage.getItem('adminUserId') || localStorage.getItem('userId') || 2;
       const payload = {
         user_id: parseInt(adminUserId, 10),
-        course_id: parseInt(selectedCourseId, 10),
+        lesson: parseInt(selectedLessonId, 10),
         title: quizForm.title,
-        total_marks: parseInt(quizForm.total_marks, 10),
+        total_questions: parseInt(quizForm.total_questions, 10),
+        marks_per_question: parseInt(quizForm.marks_per_question, 10),
         passing_marks: parseInt(quizForm.passing_marks, 10),
-        duration: parseInt(quizForm.duration, 10)
+        duration: parseInt(quizForm.duration, 10),
+        is_final: quizForm.is_final,
+        is_active: quizForm.is_active
       };
 
       if (isEditing) {
@@ -214,12 +284,15 @@ const AdminQuizzes = () => {
         const questionsList = targetQuiz ? (targetQuiz.questions || []) : [];
 
         // Recreate quiz with updated parameters but same questions
-        const newQuizId = await recreateQuizWithQuestions(selectedCourseId, {
+        const newQuizId = await recreateQuizWithQuestions(selectedLessonId, {
           id: existingQuiz.id,
           title: quizForm.title,
-          total_marks: quizForm.total_marks,
+          total_questions: quizForm.total_questions,
+          marks_per_question: quizForm.marks_per_question,
           passing_marks: quizForm.passing_marks,
-          duration: quizForm.duration
+          duration: quizForm.duration,
+          is_final: quizForm.is_final,
+          is_active: quizForm.is_active
         }, questionsList);
 
         alert("Quiz Updated Successfully!");
@@ -227,9 +300,12 @@ const AdminQuizzes = () => {
         setExistingQuiz({
           id: newQuizId,
           title: quizForm.title,
-          total_marks: quizForm.total_marks,
+          total_questions: quizForm.total_questions,
+          marks_per_question: quizForm.marks_per_question,
           passing_marks: quizForm.passing_marks,
-          duration: quizForm.duration
+          duration: quizForm.duration,
+          is_final: quizForm.is_final,
+          is_active: quizForm.is_active
         });
 
         // Reload existing quizzes list
@@ -249,14 +325,16 @@ const AdminQuizzes = () => {
         if (res.ok || data.success) {
           alert(data.message || data.success || "Quiz Created Successfully!");
           const newQuizId = (data.data?.quiz_id || data.quiz_id || data.id || "1").toString();
-          saveCourseQuizMapping(selectedCourseId, newQuizId);
           setQuizIdForQuestion(newQuizId);
           setExistingQuiz({
             id: newQuizId,
             title: quizForm.title,
-            total_marks: quizForm.total_marks,
+            total_questions: quizForm.total_questions,
+            marks_per_question: quizForm.marks_per_question,
             passing_marks: quizForm.passing_marks,
-            duration: quizForm.duration
+            duration: quizForm.duration,
+            is_final: quizForm.is_final,
+            is_active: quizForm.is_active
           });
 
           // Reload existing quizzes list to show updated details
@@ -285,12 +363,16 @@ const AdminQuizzes = () => {
       const payload = {
         user_id: parseInt(adminUserId, 10),
         quiz_id: parseInt(quizIdForQuestion, 10),
-        question: questionForm.question,
-        option1: questionForm.option1,
-        option2: questionForm.option2,
-        option3: questionForm.option3,
-        option4: questionForm.option4,
-        correct_answer: questionForm.correct_answer
+        questions: [
+          {
+            question: questionForm.question,
+            option1: questionForm.option1,
+            option2: questionForm.option2,
+            option3: questionForm.option3,
+            option4: questionForm.option4,
+            correct_answer: questionForm.correct_answer
+          }
+        ]
       };
 
       const res = await fetch(`${BASE_URL}/bsgupadmin/create-question/`, {
@@ -363,7 +445,7 @@ const AdminQuizzes = () => {
     correct_answer: ''
   });
 
-  const recreateQuizWithQuestions = async (courseId, quizDetails, questionsList) => {
+  const recreateQuizWithQuestions = async (lessonId, quizDetails, questionsList) => {
     // 1. Delete the old quiz if it exists
     if (quizDetails.id) {
       const adminUserId = localStorage.getItem('adminUserId') || localStorage.getItem('userId') || 2;
@@ -379,11 +461,14 @@ const AdminQuizzes = () => {
     const adminUserId = localStorage.getItem('adminUserId') || localStorage.getItem('userId') || 2;
     const quizPayload = {
       user_id: parseInt(adminUserId, 10),
-      course_id: parseInt(courseId, 10),
+      lesson: parseInt(lessonId, 10),
       title: quizDetails.title,
-      total_marks: parseInt(quizDetails.total_marks, 10),
+      total_questions: parseInt(quizDetails.total_questions || quizDetails.total_marks || 10, 10),
+      marks_per_question: parseInt(quizDetails.marks_per_question || 2, 10),
       passing_marks: parseInt(quizDetails.passing_marks, 10),
-      duration: parseInt(quizDetails.duration, 10)
+      duration: parseInt(quizDetails.duration, 10),
+      is_final: quizDetails.is_final !== false,
+      is_active: quizDetails.is_active !== false
     };
 
     const createRes = await fetch(`${BASE_URL}/bsgupadmin/create-quiz/`, {
@@ -402,12 +487,16 @@ const AdminQuizzes = () => {
       const qPayload = {
         user_id: parseInt(adminUserId, 10),
         quiz_id: parseInt(newQuizId, 10),
-        question: q.question,
-        option1: q.option1,
-        option2: q.option2,
-        option3: q.option3,
-        option4: q.option4,
-        correct_answer: q.correct_answer
+        questions: [
+          {
+            question: q.question,
+            option1: q.option1,
+            option2: q.option2,
+            option3: q.option3,
+            option4: q.option4,
+            correct_answer: q.correct_answer
+          }
+        ]
       };
 
       const qRes = await fetch(`${BASE_URL}/bsgupadmin/create-question/`, {
@@ -419,9 +508,6 @@ const AdminQuizzes = () => {
         console.error("Failed to add question:", q.question);
       }
     }
-
-    // 4. Save the mapping locally
-    saveCourseQuizMapping(courseId, newQuizId);
     
     return newQuizId;
   };
@@ -465,7 +551,7 @@ const AdminQuizzes = () => {
         quest => (quest.id || quest.question_id || quest.order)?.toString() !== questionId.toString()
       );
 
-      const newQuizId = await recreateQuizWithQuestions(targetQuiz.courseId, targetQuiz, questionsList);
+      const newQuizId = await recreateQuizWithQuestions(targetQuiz.lessonId, targetQuiz, questionsList);
       alert("Question Deleted Successfully!");
 
       // If we are currently editing this quiz, update the active quiz ID
@@ -498,12 +584,16 @@ const AdminQuizzes = () => {
       const payload = {
         user_id: parseInt(adminUserId, 10),
         quiz_id: parseInt(activeAddQuestionQuizId, 10),
-        question: modalQuestionForm.question,
-        option1: modalQuestionForm.option1,
-        option2: modalQuestionForm.option2,
-        option3: modalQuestionForm.option3,
-        option4: modalQuestionForm.option4,
-        correct_answer: modalQuestionForm.correct_answer
+        questions: [
+          {
+            question: modalQuestionForm.question,
+            option1: modalQuestionForm.option1,
+            option2: modalQuestionForm.option2,
+            option3: modalQuestionForm.option3,
+            option4: modalQuestionForm.option4,
+            correct_answer: modalQuestionForm.correct_answer
+          }
+        ]
       };
 
       if (isEditing) {
@@ -532,7 +622,7 @@ const AdminQuizzes = () => {
           return quest;
         });
 
-        const newQuizId = await recreateQuizWithQuestions(targetQuiz.courseId, targetQuiz, updatedQuestionsList);
+        const newQuizId = await recreateQuizWithQuestions(targetQuiz.lessonId, targetQuiz, updatedQuestionsList);
         alert("Question Updated Successfully!");
 
         // If we are currently editing this quiz, update the active quiz ID
@@ -654,6 +744,27 @@ const AdminQuizzes = () => {
                 </select>
               </div>
 
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Target Lesson</label>
+                {lessonsLoading ? (
+                  <div className="w-full border border-slate-300 p-2.5 rounded-lg bg-slate-50 text-slate-500 text-sm animate-pulse">
+                    Loading lessons...
+                  </div>
+                ) : lessons.length > 0 ? (
+                  <select
+                    value={selectedLessonId}
+                    onChange={(e) => setSelectedLessonId(e.target.value)}
+                    className="w-full max-w-full truncate border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-[#7c3aed] focus:outline-none"
+                  >
+                    {lessons.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
+                  </select>
+                ) : (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+                    ⚠️ No lessons found for this course. Please create a lesson first!
+                  </div>
+                )}
+              </div>
+
               {/* Quiz Status Card */}
               {checkingQuiz ? (
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-center">
@@ -671,8 +782,9 @@ const AdminQuizzes = () => {
                   </div>
                   <div className="text-xs text-slate-600 space-y-1">
                     <p><strong>Title:</strong> {existingQuiz.title}</p>
-                    <p><strong>Total Marks:</strong> {existingQuiz.total_marks} | <strong>Passing Marks:</strong> {existingQuiz.passing_marks}</p>
-                    <p><strong>Duration:</strong> {existingQuiz.duration} minutes</p>
+                    <p><strong>Total Questions:</strong> {existingQuiz.total_questions} | <strong>Marks per Question:</strong> {existingQuiz.marks_per_question}</p>
+                    <p><strong>Passing Marks:</strong> {existingQuiz.passing_marks} | <strong>Duration:</strong> {existingQuiz.duration} minutes</p>
+                    <p><strong>Status:</strong> {existingQuiz.is_active ? 'Active' : 'Inactive'} | {existingQuiz.is_final ? 'Final Exam' : 'Lesson Quiz'}</p>
                   </div>
                   <p className="text-[10px] text-slate-500 italic mt-2">
                     ℹ️ This Quiz ID is now automatically selected in Step 2 below so you can add questions directly!
@@ -684,7 +796,7 @@ const AdminQuizzes = () => {
                     <span>📝</span> No Quiz Created Yet
                   </span>
                   <p className="text-xs text-slate-600 mt-1">
-                    There is no quiz configured for this course. Fill out the parameters below to create the quiz first.
+                    There is no quiz configured for this lesson. Fill out the parameters below to create the quiz first.
                   </p>
                 </div>
               )}
@@ -705,16 +817,30 @@ const AdminQuizzes = () => {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1">Total Marks</label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Total Questions</label>
                     <input
                       type="number"
-                      name="total_marks"
-                      value={quizForm.total_marks}
+                      name="total_questions"
+                      value={quizForm.total_questions}
                       onChange={handleQuizChange}
                       required
                       className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-[#7c3aed] focus:outline-none"
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Marks per Question</label>
+                    <input
+                      type="number"
+                      name="marks_per_question"
+                      value={quizForm.marks_per_question}
+                      onChange={handleQuizChange}
+                      required
+                      className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-[#7c3aed] focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1">Passing Marks</label>
                     <input
@@ -726,24 +852,46 @@ const AdminQuizzes = () => {
                       className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-[#7c3aed] focus:outline-none"
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Duration (Minutes)</label>
+                    <input
+                      type="number"
+                      name="duration"
+                      value={quizForm.duration}
+                      onChange={handleQuizChange}
+                      required
+                      className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-[#7c3aed] focus:outline-none"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Duration (Minutes)</label>
-                  <input
-                    type="number"
-                    name="duration"
-                    value={quizForm.duration}
-                    onChange={handleQuizChange}
-                    required
-                    className="w-full border border-slate-300 p-2.5 rounded-lg focus:ring-2 focus:ring-[#7c3aed] focus:outline-none"
-                  />
+                <div className="flex gap-6 items-center py-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-slate-700">
+                    <input
+                      type="checkbox"
+                      name="is_final"
+                      checked={quizForm.is_final}
+                      onChange={(e) => setQuizForm({ ...quizForm, is_final: e.target.checked })}
+                      className="rounded border-slate-300 text-[#7c3aed] focus:ring-[#7c3aed]"
+                    />
+                    Is Final Exam
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-slate-700">
+                    <input
+                      type="checkbox"
+                      name="is_active"
+                      checked={quizForm.is_active}
+                      onChange={(e) => setQuizForm({ ...quizForm, is_active: e.target.checked })}
+                      className="rounded border-slate-300 text-[#7c3aed] focus:ring-[#7c3aed]"
+                    />
+                    Is Active
+                  </label>
                 </div>
 
                 <div className="flex gap-3">
                   <button
                     type="submit"
-                    disabled={isLoading}
+                    disabled={isLoading || !selectedLessonId}
                     className="flex-1 bg-[#7c3aed] text-white font-bold py-3 rounded-xl hover:bg-[#6d28d9] transition-colors disabled:opacity-50"
                   >
                     {isLoading ? 'Saving...' : existingQuiz ? 'Update Quiz Parameters' : 'Create Quiz'}
@@ -1020,13 +1168,15 @@ const AdminQuizzes = () => {
 
                         {/* Quiz Parameters */}
                         <div className="flex flex-wrap gap-4 text-xs font-semibold text-slate-600 bg-white border border-slate-200 px-4 py-2.5 rounded-xl">
+                          <div>📖 Lesson: <span className="text-slate-800">{quiz.lessonTitle || `ID: ${quiz.lessonId}`}</span></div>
+                          <div className="text-slate-300">|</div>
                           <div>⏱️ <span className="text-slate-700">{quiz.duration} Minutes</span></div>
                           <div className="text-slate-300">|</div>
                           <div>🎯 Passing Marks: <span className="text-emerald-600">{quiz.passing_marks}</span></div>
                           <div className="text-slate-300">|</div>
-                          <div>💯 Total Marks: <span className="text-slate-800">{quiz.total_marks}</span></div>
+                          <div>❓ Questions: <span className="text-slate-800">{quiz.total_questions || (quiz.questions || []).length}</span></div>
                           <div className="text-slate-300">|</div>
-                          <div>📝 Questions count: <span className="text-slate-800">{(quiz.questions || []).length}</span></div>
+                          <div>💯 Total Marks: <span className="text-slate-800">{quiz.total_marks}</span></div>
                         </div>
 
                         {/* Questions List */}

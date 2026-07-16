@@ -185,6 +185,35 @@ export const fetchQuizForCourse = async (courseId, courseTitle = '') => {
   return null;
 };
 
+export const fetchQuizForLesson = async (lessonId) => {
+  const lessonIdStr = lessonId.toString();
+
+  const tryFetch = async (url) => {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data?.success === false) return null;
+    const parsed = parseQuizResponse(data);
+    if (!parsed) return null;
+    const quizId = extractQuizId(data, null);
+    return {
+      ...parsed,
+      questions: normalizeQuestions(parsed.questions),
+      quizId: quizId != null ? quizId.toString() : null
+    };
+  };
+
+  // 1. Try lesson_id lookup
+  let result = await tryFetch(`${BASE_URL}/bsgupadmin/get-quiz/?lesson_id=${lessonIdStr}`);
+  if (result) return result;
+
+  // 2. Try lesson lookup
+  result = await tryFetch(`${BASE_URL}/bsgupadmin/get-quiz/?lesson=${lessonIdStr}`);
+  if (result) return result;
+
+  return null;
+};
+
 export const fetchQuizById = async (quizId, courseId = null) => {
   const res = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?quiz_id=${quizId}`);
   if (!res.ok) return null;

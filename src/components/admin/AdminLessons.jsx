@@ -139,10 +139,16 @@ const AdminLessons = () => {
       const res = await fetch(`${BASE_URL}/bsgupadmin/create-lesson/?lesson_id=${id}`, {
         method: 'DELETE'
       });
+      if (!res.ok) {
+        alert(`Delete failed: Server responded with status ${res.status}. Please check backend server logs.`);
+        return;
+      }
       const data = await res.json();
       if (data.success) {
         alert(data.success);
         fetchLessons();
+      } else {
+        alert(data.message || 'Action failed');
       }
     } catch (err) {
       console.error(err);

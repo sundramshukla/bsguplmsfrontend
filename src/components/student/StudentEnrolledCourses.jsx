@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BASE_URL } from '../../config';
-import { fetchQuizForCourse, getCourseQuizId } from '../../utils/quizUtils';
+import { fetchQuizForCourse, getCourseQuizId, fetchQuizForLesson } from '../../utils/quizUtils';
 import { getEnrolledCourseIds } from '../../utils/enrollmentUtils';
 import {
   processCourseEnrollment,
@@ -380,6 +380,7 @@ const StudentEnrolledCourses = () => {
   const [quizData, setQuizData] = useState(null);
   const [selectedAnswers, setSelectedAnswers] = useState({}); // { questionId: selectedOptionText }
   const [quizResult, setQuizResult] = useState(null); // { score, passed }
+  const [quizAttemptId, setQuizAttemptId] = useState(null);
   
   // Student Profile for Certificate
   const [studentName, setStudentName] = useState('Sundram Shukla');
@@ -1243,6 +1244,185 @@ const StudentEnrolledCourses = () => {
     }
   };
 
+  useEffect(() => {
+    const checkQuizForCurrentLesson = async () => {
+      if (activeCourse && lessons && lessons[currentPart - 1]) {
+        const lesson = lessons[currentPart - 1];
+        setQuizLoading(true);
+        try {
+          const quizObj = await fetchQuizForLesson(lesson.id);
+          if (quizObj && quizObj.questions && quizObj.questions.length > 0) {
+            setQuizData(quizObj);
+          } else {
+            setQuizData(null);
+          }
+        } catch (err) {
+          console.error("Error checking lesson quiz:", err);
+          setQuizData(null);
+        } finally {
+          setQuizLoading(false);
+        }
+      } else {
+        setQuizData(null);
+      }
+      setQuizStarted(false);
+      setQuizResult(null);
+      setSelectedAnswers({});
+      setQuizAttemptId(null);
+    };
+    checkQuizForCurrentLesson();
+  }, [currentPart, lessons, activeCourse]);
+
+  const startLessonQuiz = async () => {
+    if (!quizData) return;
+    setQuizLoading(true);
+    try {
+      const userId = localStorage.getItem('userId') || 3;
+      const res = await fetch(`${BASE_URL}/user/start-quiz/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: parseInt(userId, 10),
+          quiz_id: parseInt(quizData.quizId, 10)
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.data && data.data.attempt_id) {
+        setQuizAttemptId(data.data.attempt_id);
+        setQuizStarted(true);
+      } else {
+        alert("Failed to start quiz attempt on server. Please try again.");
+      }
+    } catch (err) {
+      console.error("Error starting quiz:", err);
+      alert("Error starting quiz.");
+    } finally {
+      setQuizLoading(false);
+    }
+  };
+
+  const submitLessonQuiz = async () => {
+    const questionsList = quizData.questions || [];
+    if (Object.keys(selectedAnswers).length < questionsList.length) {
+      alert("Please answer all questions before submitting!");
+      return;
+    }
+
+    setQuizLoading(true);
+    try {
+      const userId = localStorage.getItem('userId') || 3;
+      const formattedAnswers = Object.keys(selectedAnswers).map(idxKey => {
+        const questionIndex = parseInt(idxKey, 10);
+        const questionObj = questionsList[questionIndex] || {};
+        return {
+          question_id: parseInt(questionObj.id || questionObj.question_id || questionIndex, 10),
+          answer: selectedAnswers[idxKey]
+        };
+      });
+
+      const res = await fetch(`${BASE_URL}/user/start-quiz/`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: parseInt(userId, 10),
+          quiz_id: parseInt(quizData.quizId, 10),
+          attempt_id: parseInt(quizAttemptId, 10),
+          answers: formattedAnswers
+        })
+      });
+
+      if (res.ok) {
+        const resultData = await res.json();
+        if (resultData.success && resultData.data) {
+          const finalScorePercentage = Math.round(resultData.data.percentage);
+          const passed = resultData.data.passed === true || resultData.data.passed === "true";
+          
+          setQuizResult({
+            score: finalScorePercentage,
+            passed: passed,
+            message: resultData.message || (resultData.data && resultData.data.message) || ""
+          });
+
+          if (passed) {
+            // Mark the lesson completed on server
+            const currentLesson = lessons[currentPart - 1];
+            if (currentLesson && currentLesson.id) {
+              await markLessonComplete(currentLesson.id);
+            }
+            // Update unlocked progress locally
+            const nextPartNum = currentPart + 1;
+            if (nextPartNum > maxUnlockedPart) {
+              updateUnlockedProgress(nextPartNum);
+            }
+          }
+        } else {
+          alert(resultData.error || "Failed to evaluate quiz.");
+        }
+      } else {
+        alert("Failed to submit quiz to server.");
+      }
+    } catch (err) {
+      console.error("Error submitting quiz:", err);
+      alert("Error submitting quiz.");
+    } finally {
+      setQuizLoading(false);
+    }
+  };
+
+  const handleNextLesson = () => {
+    const nextPartNum = currentPart + 1;
+    if (nextPartNum <= lessons.length) {
+      setCurrentPart(nextPartNum);
+      setActiveSubLessonIndex(-1);
+      setExpandedLessons(prev => ({
+        ...prev,
+        [nextPartNum]: true
+      }));
+    } else {
+      // All lessons are completed!
+      const userId = localStorage.getItem('userId') || 3;
+      const certKey = `earnedCertificates_${userId}`;
+      const certList = JSON.parse(localStorage.getItem(certKey) || '[]');
+      if (!certList.includes(activeCourse.id)) {
+        certList.push(activeCourse.id);
+        localStorage.setItem(certKey, JSON.stringify(certList));
+      }
+      
+      const completedKey = `completedCourses_${userId}`;
+      const completedList = JSON.parse(localStorage.getItem(completedKey) || '[]');
+      if (!completedList.includes(activeCourse.id)) {
+        completedList.push(activeCourse.id);
+        localStorage.setItem(completedKey, JSON.stringify(completedList));
+      }
+
+      setCurrentPart(lessons.length + 1);
+    }
+  };
+
+  const handleVideoEnd = () => {
+    if (activeSubLessonIndex !== null && activeSubLessonIndex >= 0) {
+      const lesson = lessons[currentPart - 1];
+      if (lesson.sub_lessons && activeSubLessonIndex < lesson.sub_lessons.length - 1) {
+        setActiveSubLessonIndex(activeSubLessonIndex + 1);
+        return;
+      }
+    }
+
+    if (quizData) {
+      const userId = localStorage.getItem('userId') || 'guest';
+      const calculatedPartId = (activeSubLessonIndex !== null && activeSubLessonIndex >= 0) 
+        ? `${currentPart}_sub_${activeSubLessonIndex}` 
+        : `${currentPart}`;
+      const completedKey = `videoCompleted_${userId}_${activeCourse.id}_${calculatedPartId}`;
+      localStorage.setItem(completedKey, 'true');
+      
+      setSelectedAnswers(prev => ({ ...prev }));
+      return;
+    }
+
+    handleNextPart();
+  };
+
   const resetStudyPanel = () => {
     setActiveCourse(null);
     setCurrentPart(1);
@@ -1509,24 +1689,138 @@ const StudentEnrolledCourses = () => {
                           </div>
                         )}
 
-                        {currentPart === num && (
-                          <div className="space-y-4">
-                            {/* Content */}
+                        {currentPart === num && (() => {
+                          const userId = localStorage.getItem('userId') || 'guest';
+                          const calculatedPartId = (activeSubLessonIndex !== null && activeSubLessonIndex >= 0) 
+                            ? `${currentPart}_sub_${activeSubLessonIndex}` 
+                            : `${currentPart}`;
+                          const completedKey = `videoCompleted_${userId}_${activeCourse.id}_${calculatedPartId}`;
+                          const isVideoCompleted = localStorage.getItem(completedKey) === 'true' || maxUnlockedPart > num;
+
+                          // If the lesson has a quiz, and video is completed, render the quiz flow
+                          if (quizData && isVideoCompleted) {
+                            if (quizResult) {
+                              return (
+                                <div className="space-y-6 bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+                                  <div className="text-center py-6 space-y-4">
+                                    <div className="text-6xl">{quizResult.passed ? '🎉' : '❌'}</div>
+                                    <h4 className="text-2xl font-extrabold text-slate-800">
+                                      {quizResult.passed ? 'Lesson Quiz Passed!' : 'Lesson Quiz Failed'}
+                                    </h4>
+                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 max-w-md mx-auto space-y-2 text-left text-sm">
+                                      <p><strong>Score Secured:</strong> <span className="text-emerald-600 font-bold">{quizResult.score}%</span></p>
+                                      <p><strong>Passing Requirement:</strong> {quizData.passing_marks || 60}%</p>
+                                      {quizResult.message && <p className="text-slate-500 text-xs italic mt-2">{quizResult.message}</p>}
+                                    </div>
+                                    <div className="pt-4 flex justify-center gap-3">
+                                      {!quizResult.passed ? (
+                                        <button
+                                          onClick={() => { setQuizResult(null); setSelectedAnswers({}); setQuizStarted(false); }}
+                                          className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-6 py-2.5 rounded-xl transition-colors text-sm"
+                                        >
+                                          Try Again
+                                        </button>
+                                      ) : (
+                                        <button
+                                          onClick={handleNextLesson}
+                                          className="bg-[#7c3aed] hover:bg-[#6d28d9] text-white font-bold px-6 py-2.5 rounded-xl transition-colors text-sm"
+                                        >
+                                          {num < lessons.length ? 'Proceed to Next Lesson' : 'Finish Course & Get Certificate'}
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            if (quizStarted) {
+                              return (
+                                <div className="space-y-6 bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+                                  <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                                    <h3 className="text-lg font-bold text-slate-800">{quizData.title || 'Lesson Quiz'}</h3>
+                                    <span className="text-xs text-slate-500 font-semibold">Passing: {quizData.passing_marks || 60}%</span>
+                                  </div>
+                                  <div className="space-y-6">
+                                    {(quizData.questions || []).map((q, qidx) => (
+                                      <div key={q.id || qidx} className="border border-slate-200 rounded-xl p-4 bg-slate-50/50 text-left">
+                                        <h4 className="font-bold text-slate-800 mb-3 text-sm sm:text-base">Question {qidx + 1}: {q.question}</h4>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                          {[q.option1, q.option2, q.option3, q.option4].map((opt, oidx) => (
+                                            <button
+                                              key={oidx}
+                                              onClick={() => handleOptionSelect(qidx, opt)}
+                                              className={`w-full text-left p-2.5 rounded-lg border text-xs sm:text-sm font-semibold transition-all ${
+                                                selectedAnswers[qidx] === opt
+                                                  ? 'bg-emerald-50 border-emerald-500 text-emerald-700 ring-2 ring-emerald-500/20'
+                                                  : 'bg-white border-slate-200 hover:border-slate-350 text-slate-600'
+                                              }`}
+                                            >
+                                              {opt}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    ))}
+                                    <div className="flex justify-end pt-4 border-t border-slate-100">
+                                      <button
+                                        onClick={submitLessonQuiz}
+                                        disabled={quizLoading}
+                                        className="bg-emerald-500 text-white font-extrabold px-8 py-3 rounded-xl hover:bg-emerald-600 transition-all shadow-md shadow-emerald-500/10 disabled:opacity-50 text-sm"
+                                      >
+                                        {quizLoading ? 'Evaluating...' : 'Submit Answers'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div className="space-y-4 bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+                                <div className="text-center py-6 space-y-3">
+                                  <div className="text-5xl">📝</div>
+                                  <h4 className="text-lg font-bold text-slate-800">Lesson Video Completed!</h4>
+                                  <p className="text-xs text-slate-500 max-w-sm mx-auto">Please pass the lesson quiz to proceed. Passing mark is {quizData.passing_marks || 60}%.</p>
+                                  <button
+                                    onClick={startLessonQuiz}
+                                    disabled={quizLoading}
+                                    className="bg-emerald-500 text-white font-bold px-8 py-3 rounded-xl hover:bg-emerald-600 transition-all shadow-md disabled:opacity-50 text-sm"
+                                  >
+                                    {quizLoading ? 'Starting Quiz...' : 'Start Lesson Quiz'}
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          // Default rendering (video player)
+                          return (
                             <div className="space-y-4 animate-fadeIn">
                               <YouTubePlayer 
                                 url={activeVideoUrl} 
                                 title={activeTitle}
                                 courseId={activeCourse.id}
-                                partNum={activePartId}
-                                onVideoEnd={handleNextPart}
+                                partNum={calculatedPartId}
+                                onVideoEnd={handleVideoEnd}
                               />
-                              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-                                <h4 className="text-sm font-bold text-slate-800 mb-2">About this video</h4>
-                                <p className="text-slate-600 text-sm leading-relaxed">{activeDescription}</p>
+                              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                <div className="flex-1">
+                                  <h4 className="text-sm font-bold text-slate-800 mb-1">About this video</h4>
+                                  <p className="text-slate-600 text-xs sm:text-sm leading-relaxed">{activeDescription}</p>
+                                </div>
+                                {isVideoCompleted && (
+                                  <button
+                                    onClick={handleNextPart}
+                                    className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-5 py-2.5 rounded-xl transition-all shrink-0 text-sm"
+                                  >
+                                    {num < lessons.length ? 'Next Lesson' : 'Finish Course'}
+                                  </button>
+                                )}
                               </div>
                             </div>
-                          </div>
-                        )}
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
