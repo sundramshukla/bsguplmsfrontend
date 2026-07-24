@@ -1,12 +1,15 @@
 import React from "react";
 import "../CSS/style.css";
+import logo from "../assets/logo.png";
 
 const Footer = () => {
   return (
     <footer className="footer">
       <div className="container footer-container">
         <div className="footer-about">
-          <h2>BSG<span className="highlight">UP</span></h2>
+          <div className="inline-block bg-white rounded-lg px-3 py-2 mb-3">
+            <img src={logo} alt="BSGUP" className="h-9 w-auto" />
+          </div>
           <p>
             Elevate your professional journey with world-class education
             designed to help you succeed.

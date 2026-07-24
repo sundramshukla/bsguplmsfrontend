@@ -366,6 +366,16 @@ const StudentEnrolledCourses = () => {
   const [activePaymentCourse, setActivePaymentCourse] = useState(null);
   const [isPaying, setIsPaying] = useState(false);
   
+  const [userId, setUserId] = useState(localStorage.getItem('userId') || 'guest');
+
+  useEffect(() => {
+    const handleAuthChange = () => {
+      setUserId(localStorage.getItem('userId') || 'guest');
+    };
+    window.addEventListener('authChange', handleAuthChange);
+    return () => window.removeEventListener('authChange', handleAuthChange);
+  }, []);
+
   // Lesson Progression states
   const [currentPart, setCurrentPart] = useState(1); // currently active lesson/part index
   const [maxUnlockedPart, setMaxUnlockedPart] = useState(1); // maximum unlocked lesson/part index
@@ -639,7 +649,7 @@ const StudentEnrolledCourses = () => {
     const handleEnrollmentChange = () => fetchCourses();
     window.addEventListener('enrollmentChange', handleEnrollmentChange);
     return () => window.removeEventListener('enrollmentChange', handleEnrollmentChange);
-  }, [activeCourse]);
+  }, [activeCourse, userId]);
 
   useEffect(() => {
     const refreshEnrollments = async () => {
@@ -766,7 +776,7 @@ const StudentEnrolledCourses = () => {
       };
       fetchCourseLessons();
     }
-  }, [activeCourse]);
+  }, [activeCourse, userId]);
 
   useEffect(() => {
     const refreshEnrollments = async () => {
@@ -912,7 +922,7 @@ const StudentEnrolledCourses = () => {
       setQuizResult(null);
       setSelectedAnswers({});
     }
-  }, [activeCourse]);
+  }, [activeCourse, userId]);
 
   const updateUnlockedProgress = (newVal) => {
     const refreshEnrollments = async () => {

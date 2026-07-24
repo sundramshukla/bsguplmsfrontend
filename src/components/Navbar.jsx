@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import "../CSS/style.css";
 import { BASE_URL } from '../config';
+import logo from '../assets/logo.png';
 
 const parseJwt = (token) => {
   try {
@@ -215,10 +216,11 @@ const Navbar = () => {
         const token = extractToken(data);
         let returnedUserId = null;
         let isAdmin = false;
+        let decoded = null;
 
         if (token) {
            localStorage.setItem('token', token);
-           const decoded = parseJwt(token);
+           decoded = parseJwt(token);
            if (decoded) {
               returnedUserId = findUserId(decoded);
               const decodedStr = JSON.stringify(decoded).toLowerCase();
@@ -525,6 +527,11 @@ const Navbar = () => {
       });
 
       if (res.ok) {
+        const pData = await res.json().catch(() => ({}));
+        console.log("Profile submit response:", pData);
+        const resolvedUserId = (pData && (pData.user || pData.user_id)) || finalUserId;
+        localStorage.setItem('userId', resolvedUserId.toString());
+
         setIsLoggedIn(true);
         localStorage.setItem('isLoggedIn', 'true');
         localStorage.setItem('isStudentLoggedIn', 'true');
@@ -637,11 +644,7 @@ const Navbar = () => {
       const role = localStorage.getItem('role') || (localStorage.getItem('isAdminLoggedIn') ? 'admin' : 'student');
       if (token && userId && role === 'student') {
         try {
-          const res = await fetch(`${BASE_URL}/bsgupadmin/profile/?user_id=${userId}`, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
+          const res = await fetch(`${BASE_URL}/bsgupadmin/profile/?user_id=${userId}`);
           if (res.status === 401) {
             handleLogout();
           }
@@ -660,8 +663,7 @@ const Navbar = () => {
       <header className="navbar relative">
         <div className="container nav-container flex justify-between items-center px-4 md:px-0">
           <div className="logo cursor-pointer flex items-center gap-2" onClick={() => { window.location.hash = '#'; setIsMobileMenuOpen(false); }}>
-            <span className="logo-icon text-2xl">📘</span>
-            <span className="text-xl font-bold text-slate-900">BS<span className="highlight">GUP</span></span>
+            <img src={logo} alt="BSGUP" className="h-11 w-auto" />
           </div>
 
           <nav className="nav-links">

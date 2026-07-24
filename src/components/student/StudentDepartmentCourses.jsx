@@ -15,7 +15,7 @@ const StudentDepartmentCourses = ({ department, title }) => {
   const [activePaymentCourse, setActivePaymentCourse] = useState(null);
   const [isPaying, setIsPaying] = useState(false);
 
-  const userId = localStorage.getItem('userId') || 'guest';
+  const [userId, setUserId] = useState(localStorage.getItem('userId') || 'guest');
 
   const refreshEnrollments = async () => {
     if (!userId || userId === 'guest') {
@@ -46,7 +46,15 @@ const StudentDepartmentCourses = ({ department, title }) => {
     };
     fetchCourses();
     refreshEnrollments();
-  }, [department]);
+  }, [department, userId]);
+
+  useEffect(() => {
+    const handleAuthChange = () => {
+      setUserId(localStorage.getItem('userId') || 'guest');
+    };
+    window.addEventListener('authChange', handleAuthChange);
+    return () => window.removeEventListener('authChange', handleAuthChange);
+  }, []);
 
   useEffect(() => {
     const handleEnrollmentChange = () => refreshEnrollments();
