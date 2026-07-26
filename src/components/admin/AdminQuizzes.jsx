@@ -1031,7 +1031,7 @@ const AdminQuizzes = () => {
                   disabled={isLoading}
                   className="w-full bg-[#7c3aed] text-white font-bold py-3 rounded-xl hover:bg-[#6d28d9] transition-colors disabled:opacity-50"
                 >
-                  {isLoading ? 'Adding...' : 'Add Question API'}
+                  {isLoading ? 'Adding...' : 'Add Question'}
                 </button>
               </form>
             </div>
