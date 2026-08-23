@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import orgPhoto from '../assets/Images/department.jpg';
-import trainingPhoto from '../assets/Images/Training.jpeg';
-import itPhoto from '../assets/Images/IT.jpg';
+
+const youthPhoto = '/YOUTH PROGRAMME COVER ART (1)/YOUTH PROGRAMME COVER ART.webp';
+const adultPhoto = '/YOUTH PROGRAMME COVER ART (1)/ADULTS LEADER COVER ART.webp';
+const techPhoto = '/YOUTH PROGRAMME COVER ART (1)/TECH SKILL PROGRAMME COVER ART.webp';
 
 function LearningPaths() {
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
@@ -38,17 +39,17 @@ function LearningPaths() {
           </div>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3 md:gap-8">
-            {/* Beginner Card (Organization) - Unchanged */}
+            {/* Youth Programme Card */}
             <article className="bg-white p-7 rounded-xl border border-[#eee] shadow-sm hover:shadow-md transition-shadow">
               <img 
-                src={orgPhoto} 
-                alt="Organization Department" 
-                className="w-full h-32 object-cover rounded-lg mb-4 shadow-md"
+                src={youthPhoto} 
+                alt="Youth Programme" 
+                className="w-full h-auto object-contain rounded-lg mb-4 shadow-md"
               />
               <div className="w-12 h-12 bg-[#7c3aed]/10 rounded-lg flex items-center justify-center text-[#7c3aed] mb-5">
                 <span className="material-symbols-outlined text-3xl">menu_book</span>
               </div>
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">Organization Department</h3>
+              <h3 className="text-lg font-semibold text-slate-900 mb-2">Youth Programme</h3>
               <p className="text-slate-600 leading-relaxed mb-5 text-sm">
                 Start from scratch with fundamentals and build a solid foundation in your chosen field. No prior experience required.
               </p>
@@ -60,17 +61,17 @@ function LearningPaths() {
               </button>
             </article>
 
-            {/* Training Department Card - Updated */}
+            {/* Adults Leader Programme Card */}
             <article className="bg-white p-7 rounded-xl border border-[#eee] shadow-sm hover:shadow-md transition-shadow">
               <img 
-                src={trainingPhoto} 
-                alt="Beginner Training Course" 
-                className="w-full h-32 object-cover rounded-lg mb-4 shadow-md"
+                src={adultPhoto} 
+                alt="Adults Leader Programme" 
+                className="w-full h-auto object-contain rounded-lg mb-4 shadow-md"
               />
               <div className="w-12 h-12 bg-[#7c3aed]/10 rounded-lg flex items-center justify-center text-[#7c3aed] mb-5">
                 <span className="material-symbols-outlined text-3xl">rocket_launch</span>
               </div>
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">Training Department</h3>
+              <h3 className="text-lg font-semibold text-slate-900 mb-2">Adults Leader Programme</h3>
               <p className="text-slate-600 leading-relaxed mb-5 text-sm">
                 Bridge the gap to professional proficiency with practical projects and advanced workflows for career advancement.
               </p>
@@ -82,17 +83,17 @@ function LearningPaths() {
               </button>
             </article>
 
-            {/* Advanced Card - Unchanged */}
+            {/* Tech Skill Programme Card */}
             <article className="bg-white p-7 rounded-xl border border-[#eee] shadow-sm hover:shadow-md transition-shadow">
               <img 
-                src={itPhoto} 
-                alt="It Department" 
-                className="w-full h-32 object-cover rounded-lg mb-4 shadow-md"
+                src={techPhoto} 
+                alt="Tech Skill Programme" 
+                className="w-full h-auto object-contain rounded-lg mb-4 shadow-md"
               />
               <div className="w-12 h-12 bg-[#7c3aed]/10 rounded-lg flex items-center justify-center text-[#7c3aed] mb-5">
                 <span className="material-symbols-outlined text-3xl">trophy</span>
               </div>
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">It Department</h3>
+              <h3 className="text-lg font-semibold text-slate-900 mb-2">Tech Skill Programme</h3>
               <p className="text-slate-600 leading-relaxed mb-5 text-sm">
                 Master advanced techniques and leadership skills. Designed for senior roles and specialized expert positions.
               </p>
