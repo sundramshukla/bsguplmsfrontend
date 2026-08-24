@@ -40,7 +40,10 @@ function LearningPaths() {
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3 md:gap-8">
             {/* Youth Programme Card */}
-            <article className="bg-white p-7 rounded-xl border border-[#eee] shadow-sm hover:shadow-md transition-shadow">
+            <article 
+              onClick={() => window.location.hash = '#courses'}
+              className="bg-white p-7 rounded-xl border border-[#eee] shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer hover:-translate-y-1"
+            >
               <img 
                 src={youthPhoto} 
                 alt="Youth Programme" 
@@ -50,19 +53,16 @@ function LearningPaths() {
                 <span className="material-symbols-outlined text-3xl">menu_book</span>
               </div>
               <h3 className="text-lg font-semibold text-slate-900 mb-2">Youth Programme</h3>
-              <p className="text-slate-600 leading-relaxed mb-5 text-sm">
+              <p className="text-slate-600 leading-relaxed text-sm">
                 Start from scratch with fundamentals and build a solid foundation in your chosen field. No prior experience required.
               </p>
-              <button 
-                onClick={() => window.location.hash = '#courses'} 
-                className="text-[#7c3aed] font-semibold inline-flex items-center gap-2 hover:gap-3 transition-all bg-[#7c3aed]/10 px-4 py-2 rounded-lg hover:bg-[#7c3aed]/20"
-              >
-                Explore Path <span className="material-symbols-outlined text-base">arrow_forward</span>
-              </button>
             </article>
 
             {/* Adults Leader Programme Card */}
-            <article className="bg-white p-7 rounded-xl border border-[#eee] shadow-sm hover:shadow-md transition-shadow">
+            <article 
+              onClick={() => window.location.hash = '#courses'}
+              className="bg-white p-7 rounded-xl border border-[#eee] shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer hover:-translate-y-1"
+            >
               <img 
                 src={adultPhoto} 
                 alt="Adults Leader Programme" 
@@ -72,19 +72,16 @@ function LearningPaths() {
                 <span className="material-symbols-outlined text-3xl">rocket_launch</span>
               </div>
               <h3 className="text-lg font-semibold text-slate-900 mb-2">Adults Leader Programme</h3>
-              <p className="text-slate-600 leading-relaxed mb-5 text-sm">
+              <p className="text-slate-600 leading-relaxed text-sm">
                 Bridge the gap to professional proficiency with practical projects and advanced workflows for career advancement.
               </p>
-              <button
-                onClick={() => window.location.hash = '#courses'}
-                className="text-[#7c3aed] font-semibold inline-flex items-center gap-2 hover:gap-3 transition-all bg-[#7c3aed]/10 px-4 py-2 rounded-lg hover:bg-[#7c3aed]/20"
-              >
-                Explore Path <span className="material-symbols-outlined text-base">arrow_forward</span>
-              </button>
             </article>
 
             {/* Tech Skill Programme Card */}
-            <article className="bg-white p-7 rounded-xl border border-[#eee] shadow-sm hover:shadow-md transition-shadow">
+            <article 
+              onClick={() => window.location.hash = '#courses'}
+              className="bg-white p-7 rounded-xl border border-[#eee] shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer hover:-translate-y-1"
+            >
               <img 
                 src={techPhoto} 
                 alt="Tech Skill Programme" 
@@ -94,15 +91,9 @@ function LearningPaths() {
                 <span className="material-symbols-outlined text-3xl">trophy</span>
               </div>
               <h3 className="text-lg font-semibold text-slate-900 mb-2">Tech Skill Programme</h3>
-              <p className="text-slate-600 leading-relaxed mb-5 text-sm">
+              <p className="text-slate-600 leading-relaxed text-sm">
                 Master advanced techniques and leadership skills. Designed for senior roles and specialized expert positions.
               </p>
-              <button 
-                onClick={() => window.location.hash = '#courses'} 
-                className="text-[#7c3aed] font-semibold inline-flex items-center gap-2 hover:gap-3 transition-all bg-[#7c3aed]/10 px-4 py-2 rounded-lg hover:bg-[#7c3aed]/20"
-              >
-                Explore Path <span className="material-symbols-outlined text-base">arrow_forward</span>
-              </button>
             </article>
           </div>
         </div>
