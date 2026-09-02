@@ -7,6 +7,7 @@ import {
   navigateToPaymentResult,
   appendLocalPaymentHistory
 } from '../../utils/paymentUtils';
+import { generateCertificatePdf, saveCertificateToBackend } from '../../utils/certificateUtils';
 import Loader from '../Loader';
 
 const YouTubePlayer = ({ url, title, courseId, partNum, onVideoEnd }) => {
@@ -394,7 +395,46 @@ const StudentEnrolledCourses = () => {
   
   // Student Profile for Certificate
   const [studentName, setStudentName] = useState('Sundram Shukla');
+  const [studentDistrict, setStudentDistrict] = useState('');
+  const [certificateNumber, setCertificateNumber] = useState('');
   const [showCertificate, setShowCertificate] = useState(false);
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    const courseId = activeCourse.id ? activeCourse.id.toString() : '';
+    const dept = (activeCourse.department || 'training').toLowerCase();
+    const customTemplateStr =
+      localStorage.getItem(`certificate_template_${courseId}`) ||
+      localStorage.getItem('certificate_template_default') ||
+      localStorage.getItem(`certificate_template_${dept}`);
+    const templateConfig = customTemplateStr ? JSON.parse(customTemplateStr) : {};
+
+    setPdfGenerating(true);
+    try {
+      const { pdf, file } = await generateCertificatePdf({
+        studentName,
+        district: studentDistrict,
+        certificateNumber,
+        courseTitle: activeCourse.title,
+        templateConfig
+      });
+      pdf.save(`${certificateNumber || 'Certificate'}.pdf`);
+
+      const userId = localStorage.getItem('userId') || 1;
+      if (certificateNumber) {
+        await saveCertificateToBackend({
+          userId,
+          certificateNumber,
+          pdfFile: file
+        });
+      }
+    } catch (err) {
+      console.error("PDF download fallback to print:", err);
+      handlePrintCertificate();
+    } finally {
+      setPdfGenerating(false);
+    }
+  };
 
   const handlePrintCertificate = () => {
     const courseId = activeCourse.id ? activeCourse.id.toString() : '';
@@ -413,12 +453,17 @@ const StudentEnrolledCourses = () => {
       nameColor: '#1e293b',
       nameFontWeight: 'bold',
       nameUnderline: false,
+      showDistrict: true,
+      districtPositionX: 50,
+      districtPositionY: 56,
+      districtFontSize: 14,
+      districtColor: '#334155',
       showDate: false,
       datePositionX: 25,
       datePositionY: 80,
       dateFontSize: 13,
       dateColor: '#475569',
-      showCertId: false,
+      showCertId: true,
       certIdPositionX: 75,
       certIdPositionY: 80,
       certIdFontSize: 13,
@@ -1365,6 +1410,7 @@ const StudentEnrolledCourses = () => {
         const questionObj = questionsList[questionIndex] || {};
         return {
           question_id: parseInt(questionObj.id || questionObj.question_id || questionIndex, 10),
+          selected_answer: selectedAnswers[idxKey],
           answer: selectedAnswers[idxKey]
         };
       });
@@ -1392,7 +1438,60 @@ const StudentEnrolledCourses = () => {
             message: resultData.message || (resultData.data && resultData.data.message) || ""
           });
 
+          // Check if certificate data returned in quiz submission response
+          const certObj = resultData.data.certificate || resultData.certificate || null;
+          let currentCertNum = certificateNumber;
+          let currentStudName = studentName;
+          let currentDistrict = studentDistrict;
+
+          if (certObj) {
+            if (certObj.student_name) {
+              setStudentName(certObj.student_name);
+              currentStudName = certObj.student_name;
+            }
+            if (certObj.district) {
+              setStudentDistrict(certObj.district);
+              currentDistrict = certObj.district;
+            }
+            if (certObj.certificate_number) {
+              setCertificateNumber(certObj.certificate_number);
+              currentCertNum = certObj.certificate_number;
+            }
+
+            const courseId = activeCourse.id ? activeCourse.id.toString() : '';
+            localStorage.setItem(`earned_certificate_${courseId}_${userId}`, JSON.stringify(certObj));
+          }
+
           if (passed) {
+            // Auto generate & upload PDF certificate to /user/save-certificate/
+            if (currentCertNum) {
+              try {
+                const courseId = activeCourse.id ? activeCourse.id.toString() : '';
+                const dept = (activeCourse.department || 'training').toLowerCase();
+                const customTemplateStr =
+                  localStorage.getItem(`certificate_template_${courseId}`) ||
+                  localStorage.getItem('certificate_template_default') ||
+                  localStorage.getItem(`certificate_template_${dept}`);
+                const templateConfig = customTemplateStr ? JSON.parse(customTemplateStr) : {};
+
+                generateCertificatePdf({
+                  studentName: currentStudName,
+                  district: currentDistrict,
+                  certificateNumber: currentCertNum,
+                  courseTitle: activeCourse.title,
+                  templateConfig
+                }).then(async ({ file }) => {
+                  await saveCertificateToBackend({
+                    userId,
+                    certificateNumber: currentCertNum,
+                    pdfFile: file
+                  });
+                }).catch(e => console.error("Auto cert upload error:", e));
+              } catch (e) {
+                console.error("Certificate auto-generation error:", e);
+              }
+            }
+
             // Mark the lesson completed on server
             const currentLesson = lessons[currentPart - 1];
             if (currentLesson && currentLesson.id) {
@@ -2129,6 +2228,24 @@ const StudentEnrolledCourses = () => {
                       {studentName}
                     </div>
 
+                    {/* Optional District */}
+                    {(template.showDistrict !== false && (studentDistrict || template.showDistrict)) && (
+                      <div 
+                        style={{
+                          position: 'absolute',
+                          left: `${template.districtPositionX || 50}%`,
+                          top: `${template.districtPositionY || 56}%`,
+                          transform: 'translate(-50%, -50%)',
+                          fontSize: `${template.districtFontSize || 14}px`,
+                          color: template.districtColor || '#334155',
+                          fontWeight: 600,
+                          zIndex: 10
+                        }}
+                      >
+                        {studentDistrict ? `District: ${studentDistrict}` : 'District: GORAKHPUR'}
+                      </div>
+                    )}
+
                     {template.showDate && (
                       <div 
                         style={{
@@ -2146,7 +2263,7 @@ const StudentEnrolledCourses = () => {
                       </div>
                     )}
 
-                    {template.showCertId && (
+                    {(template.showCertId !== false && (certificateNumber || template.showCertId)) && (
                       <div 
                         style={{
                           position: 'absolute',
@@ -2159,7 +2276,7 @@ const StudentEnrolledCourses = () => {
                           zIndex: 10
                         }}
                       >
-                        Certificate No: {certNumber}
+                        Certificate No: {certificateNumber || certNumber}
                       </div>
                     )}
 
@@ -2238,10 +2355,17 @@ const StudentEnrolledCourses = () => {
 
                 <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center items-center">
                   <button 
-                    onClick={handlePrintCertificate}
-                    className="w-full sm:w-auto bg-[#10b981] hover:bg-[#059669] text-white font-extrabold px-6 py-2.5 rounded-xl transition-all shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2 text-sm"
+                    onClick={handleDownloadPdf}
+                    disabled={pdfGenerating}
+                    className="w-full sm:w-auto bg-[#10b981] hover:bg-[#059669] text-white font-extrabold px-6 py-2.5 rounded-xl transition-all shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2 text-sm disabled:opacity-50"
                   >
-                    <span>⬇️</span> Download PDF / Print Certificate
+                    <span>⬇️</span> {pdfGenerating ? 'Generating PDF...' : 'Download PDF Certificate'}
+                  </button>
+                  <button 
+                    onClick={handlePrintCertificate}
+                    className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white font-bold px-5 py-2.5 rounded-xl transition-all shadow-md shadow-purple-500/20 flex items-center justify-center gap-2 text-sm"
+                  >
+                    <span>🖨️</span> Print View
                   </button>
                   <button 
                     onClick={() => setShowCertificate(false)}

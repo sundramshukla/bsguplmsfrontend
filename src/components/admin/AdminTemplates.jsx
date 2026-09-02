@@ -29,6 +29,13 @@ const AdminTemplates = () => {
     nameUnderline: false,
     nameLetterSpacing: '0px',
     
+    // Optional District
+    showDistrict: true,
+    districtPositionX: 50,
+    districtPositionY: 56,
+    districtFontSize: 14,
+    districtColor: '#334155',
+
     // Optional Date
     showDate: false,
     datePositionX: 25,
@@ -37,7 +44,7 @@ const AdminTemplates = () => {
     dateColor: '#475569',
     
     // Optional Cert ID
-    showCertId: false,
+    showCertId: true,
     certIdPositionX: 75,
     certIdPositionY: 80,
     certIdFontSize: 13,
@@ -503,6 +510,49 @@ const AdminTemplates = () => {
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Optional Dynamic Fields</h4>
             
+            {/* Show District Toggle */}
+            <div className="border border-slate-100 rounded-xl p-3 bg-slate-50 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={config.showDistrict}
+                    onChange={(e) => setConfig({ ...config, showDistrict: e.target.checked })}
+                    className="accent-[#7c3aed] w-4 h-4 rounded cursor-pointer"
+                  />
+                  Print Student District
+                </label>
+                {config.showDistrict && <span className="text-[10px] text-purple-600 font-bold">Y: {config.districtPositionY}%</span>}
+              </div>
+
+              {config.showDistrict && (
+                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200 text-xs">
+                  <div>
+                    <label className="block text-[10px] text-slate-500 mb-1">District Top Position (%)</label>
+                    <input
+                      type="range"
+                      min="10"
+                      max="95"
+                      value={config.districtPositionY}
+                      onChange={(e) => setConfig({ ...config, districtPositionY: parseInt(e.target.value, 10) })}
+                      className="w-full accent-[#7c3aed]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-500 mb-1">District Left Position (%)</label>
+                    <input
+                      type="range"
+                      min="5"
+                      max="95"
+                      value={config.districtPositionX}
+                      onChange={(e) => setConfig({ ...config, districtPositionX: parseInt(e.target.value, 10) })}
+                      className="w-full accent-[#7c3aed]"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Show Date Toggle */}
             <div className="border border-slate-100 rounded-xl p-3 bg-slate-50 space-y-3">
               <div className="flex items-center justify-between">
@@ -662,6 +712,25 @@ const AdminTemplates = () => {
             >
               {testStudentName || 'Student Name'}
             </div>
+
+            {/* Optional District */}
+            {config.showDistrict && (
+              <div
+                style={{
+                  position: 'absolute',
+                  left: `${config.districtPositionX}%`,
+                  top: `${config.districtPositionY}%`,
+                  transform: 'translate(-50%, -50%)',
+                  fontSize: `${config.districtFontSize}px`,
+                  color: config.districtColor,
+                  fontWeight: 600,
+                  pointerEvents: 'none',
+                  zIndex: 10
+                }}
+              >
+                District: GORAKHPUR
+              </div>
+            )}
 
             {/* Optional Date */}
             {config.showDate && (
