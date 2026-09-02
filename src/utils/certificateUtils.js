@@ -2,10 +2,10 @@ import { jsPDF } from 'jspdf';
 import { BASE_URL } from '../config';
 
 /**
- * Generate a high-resolution PDF certificate Blob/File from template configuration & student data
+ * Generate a high-resolution PDF certificate using HTML5 Canvas & jsPDF
  */
-export const generateCertificatePdf = async ({
-  studentName = 'Student Name',
+export const generateCertificatePdf = ({
+  studentName = 'Sundram Shukla',
   district = '',
   certificateNumber = '',
   courseTitle = '',
@@ -16,7 +16,7 @@ export const generateCertificatePdf = async ({
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
 
-      // High-resolution certificate dimensions (A4 Landscape 300 DPI approx)
+      // High-resolution certificate dimensions (A4 Landscape approx 2000 x 1414 px)
       const WIDTH = 2000;
       const HEIGHT = 1414;
       canvas.width = WIDTH;
@@ -25,9 +25,9 @@ export const generateCertificatePdf = async ({
       const renderTextOverlay = () => {
         // 1. Render Student Name
         const nameX = (templateConfig.namePositionX ?? 50) / 100 * WIDTH;
-        const nameY = (templateConfig.namePositionY ?? 50) / 100 * HEIGHT;
+        const nameY = (templateConfig.namePositionY ?? 49) / 100 * HEIGHT;
         const rawFontSize = templateConfig.nameFontSize ?? 40;
-        const scaledFontSize = Math.round(rawFontSize * 2.8); // scale for 2000px canvas
+        const scaledFontSize = Math.round(rawFontSize * 2.8);
 
         const fontFamily = templateConfig.nameFontFamily || 'Pinyon Script';
         const fontWeight = templateConfig.nameFontWeight || 'bold';
@@ -37,71 +37,69 @@ export const generateCertificatePdf = async ({
         ctx.textBaseline = 'middle';
         ctx.fillText(studentName, nameX, nameY);
 
-        if (templateConfig.nameUnderline) {
+        if (templateConfig.nameUnderline !== false) {
           const textMetrics = ctx.measureText(studentName);
           const underlineY = nameY + (scaledFontSize / 2) + 6;
           ctx.beginPath();
-          ctx.strokeStyle = templateConfig.nameColor || '#1e293b';
+          ctx.strokeStyle = templateConfig.nameColor || '#fbbf24';
           ctx.lineWidth = 3;
           ctx.moveTo(nameX - textMetrics.width / 2, underlineY);
           ctx.lineTo(nameX + textMetrics.width / 2, underlineY);
           ctx.stroke();
         }
 
-        // 2. Render District if available / configured
-        if (district || templateConfig.showDistrict) {
-          const distText = district ? `District: ${district}` : '';
+        // 2. Render District
+        const formattedDistrict = district ? `District: ${district}` : '';
+        if (formattedDistrict || templateConfig.showDistrict) {
           const distX = (templateConfig.districtPositionX ?? 50) / 100 * WIDTH;
-          const distY = (templateConfig.districtPositionY ?? 58) / 100 * HEIGHT;
+          const distY = (templateConfig.districtPositionY ?? 56) / 100 * HEIGHT;
           const distFontSize = Math.round((templateConfig.districtFontSize ?? 14) * 2.5);
-          ctx.font = `600 ${distFontSize}px 'Inter', sans-serif`;
+          ctx.font = `700 ${distFontSize}px 'Inter', sans-serif`;
           ctx.fillStyle = templateConfig.districtColor || '#475569';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          if (distText) {
-            ctx.fillText(distText, distX, distY);
+          if (formattedDistrict) {
+            ctx.fillText(formattedDistrict, distX, distY);
           }
         }
 
-        // 3. Render Certificate Number
-        if (certificateNumber || templateConfig.showCertId) {
-          const certText = certificateNumber ? `Certificate No: ${certificateNumber}` : '';
-          const certX = (templateConfig.certIdPositionX ?? 75) / 100 * WIDTH;
-          const certY = (templateConfig.certIdPositionY ?? 80) / 100 * HEIGHT;
-          const certFontSize = Math.round((templateConfig.certIdFontSize ?? 13) * 2.5);
-          ctx.font = `600 ${certFontSize}px 'Inter', sans-serif`;
-          ctx.fillStyle = templateConfig.certIdColor || '#475569';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          if (certText) {
-            ctx.fillText(certText, certX, certY);
-          }
-        }
-
-        // 4. Render Date
-        if (templateConfig.showDate) {
-          const dateText = `Date: ${new Date().toLocaleDateString('en-GB')}`;
-          const dateX = (templateConfig.datePositionX ?? 25) / 100 * WIDTH;
-          const dateY = (templateConfig.datePositionY ?? 80) / 100 * HEIGHT;
-          const dateFontSize = Math.round((templateConfig.dateFontSize ?? 13) * 2.5);
-          ctx.font = `600 ${dateFontSize}px 'Inter', sans-serif`;
-          ctx.fillStyle = templateConfig.dateColor || '#475569';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(dateText, dateX, dateY);
-        }
-
-        // 5. Render Course Title if enabled
-        if (templateConfig.showCourseTitle && courseTitle) {
+        // 3. Render Course Title
+        if (courseTitle) {
           const cX = (templateConfig.courseTitlePositionX ?? 50) / 100 * WIDTH;
-          const cY = (templateConfig.courseTitlePositionY ?? 62) / 100 * HEIGHT;
+          const cY = (templateConfig.courseTitlePositionY ?? 65) / 100 * HEIGHT;
           const cFontSize = Math.round((templateConfig.courseTitleFontSize ?? 18) * 2.5);
-          ctx.font = `700 ${cFontSize}px 'Inter', sans-serif`;
+          ctx.font = `800 ${cFontSize}px 'Inter', sans-serif`;
           ctx.fillStyle = templateConfig.courseTitleColor || '#047857';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(courseTitle, cX, cY);
         }
+
+        // 4. Render Certificate Number
+        const formattedCertId = certificateNumber ? `Certificate No: ${certificateNumber}` : '';
+        if (formattedCertId || templateConfig.showCertId) {
+          const certX = (templateConfig.certIdPositionX ?? 75) / 100 * WIDTH;
+          const certY = (templateConfig.certIdPositionY ?? 82) / 100 * HEIGHT;
+          const certFontSize = Math.round((templateConfig.certIdFontSize ?? 13) * 2.4);
+          ctx.font = `700 ${certFontSize}px 'Inter', sans-serif`;
+          ctx.fillStyle = templateConfig.certIdColor || '#475569';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          if (formattedCertId) {
+            ctx.fillText(formattedCertId, certX, certY);
+          }
+        }
+
+        // 5. Render Date
+        const dateText = `Date: ${new Date().toLocaleDateString('en-GB')}`;
+        const dateX = (templateConfig.datePositionX ?? 25) / 100 * WIDTH;
+        const dateY = (templateConfig.datePositionY ?? 82) / 100 * HEIGHT;
+        const dateFontSize = Math.round((templateConfig.dateFontSize ?? 13) * 2.4);
+        ctx.font = `700 ${dateFontSize}px 'Inter', sans-serif`;
+        ctx.fillStyle = templateConfig.dateColor || '#475569';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(dateText, dateX, dateY);
 
         // Generate PDF using jsPDF
         const imgData = canvas.toDataURL('image/jpeg', 0.95);
@@ -113,7 +111,7 @@ export const generateCertificatePdf = async ({
 
         pdf.addImage(imgData, 'JPEG', 0, 0, WIDTH, HEIGHT);
         const pdfBlob = pdf.output('blob');
-        const fileName = `${certificateNumber || 'Certificate'}.pdf`;
+        const fileName = `${certificateNumber || 'BSGUP_Certificate'}.pdf`;
         const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
         resolve({
@@ -132,7 +130,6 @@ export const generateCertificatePdf = async ({
           renderTextOverlay();
         };
         bgImg.onerror = () => {
-          // Fallback if image fails to load
           drawClassicFallback(ctx, WIDTH, HEIGHT, templateConfig, courseTitle);
           renderTextOverlay();
         };
@@ -147,7 +144,7 @@ export const generateCertificatePdf = async ({
   });
 };
 
-const drawClassicFallback = (ctx, WIDTH, HEIGHT, templateConfig, courseTitle) => {
+const drawClassicFallback = (ctx, WIDTH, HEIGHT, templateConfig) => {
   // Background
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
@@ -167,29 +164,58 @@ const drawClassicFallback = (ctx, WIDTH, HEIGHT, templateConfig, courseTitle) =>
   // Emblems and static titles
   ctx.font = '80px serif';
   ctx.textAlign = 'center';
-  ctx.fillText('⚜️', WIDTH / 2, 220);
+  ctx.fillText('⚜️', WIDTH / 2, 200);
 
-  ctx.font = "900 65px 'Cinzel', serif";
+  ctx.font = "900 60px 'Cinzel', serif";
   ctx.fillStyle = templateConfig.textColor || '#1e293b';
-  ctx.fillText(templateConfig.title || 'THE BHARAT SCOUTS & GUIDES', WIDTH / 2, 330);
+  ctx.fillText(templateConfig.title || 'THE BHARAT SCOUTS & GUIDES', WIDTH / 2, 290);
 
-  ctx.font = "800 30px 'Inter', sans-serif";
+  ctx.font = "800 28px 'Inter', sans-serif";
   ctx.fillStyle = '#d97706';
-  ctx.fillText((templateConfig.subHeader || 'UTTAR PRADESH STATE HEADQUARTERS').toUpperCase(), WIDTH / 2, 390);
+  ctx.fillText((templateConfig.subHeader || 'UTTAR PRADESH STATE HEADQUARTERS').toUpperCase(), WIDTH / 2, 345);
 
-  ctx.font = "italic 600 32px 'Inter', sans-serif";
+  ctx.font = "italic 600 30px 'Inter', sans-serif";
   ctx.fillStyle = '#64748b';
-  ctx.fillText(templateConfig.certificationText || 'This is to certify that', WIDTH / 2, 490);
+  ctx.fillText(templateConfig.certificationText || 'This is to certify that', WIDTH / 2, 420);
 
-  ctx.font = "500 30px 'Inter', sans-serif";
+  ctx.font = "500 28px 'Inter', sans-serif";
   ctx.fillStyle = '#334155';
-  ctx.fillText(templateConfig.descriptionText || 'has successfully completed the online training syllabus and passed the qualified examinations of the', WIDTH / 2, 850);
+  ctx.fillText(
+    templateConfig.descriptionText || 'has successfully completed the online training syllabus and passed the qualified examinations of the',
+    WIDTH / 2,
+    770
+  );
 
-  if (courseTitle) {
-    ctx.font = "800 40px 'Inter', sans-serif";
-    ctx.fillStyle = '#047857';
-    ctx.fillText(courseTitle, WIDTH / 2, 930);
-  }
+  // Signatures
+  const sigY = 1200;
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#94a3b8';
+
+  // Left signature line
+  ctx.beginPath();
+  ctx.moveTo(WIDTH * 0.25 - 120, sigY);
+  ctx.lineTo(WIDTH * 0.25 + 120, sigY);
+  ctx.stroke();
+
+  ctx.font = "italic 600 24px 'Inter', sans-serif";
+  ctx.fillStyle = templateConfig.textColor || '#1e293b';
+  ctx.fillText(templateConfig.sigLeftTitle || 'State Commissioner', WIDTH * 0.25, sigY + 35);
+  ctx.font = "700 18px 'Inter', sans-serif";
+  ctx.fillStyle = '#94a3b8';
+  ctx.fillText(templateConfig.sigLeftSub || 'BSGUP Head Office', WIDTH * 0.25, sigY + 65);
+
+  // Right signature line
+  ctx.beginPath();
+  ctx.moveTo(WIDTH * 0.75 - 120, sigY);
+  ctx.lineTo(WIDTH * 0.75 + 120, sigY);
+  ctx.stroke();
+
+  ctx.font = "italic 600 24px 'Inter', sans-serif";
+  ctx.fillStyle = templateConfig.textColor || '#1e293b';
+  ctx.fillText(templateConfig.sigRightTitle || 'State Secretary', WIDTH * 0.75, sigY + 35);
+  ctx.font = "700 18px 'Inter', sans-serif";
+  ctx.fillStyle = '#94a3b8';
+  ctx.fillText(templateConfig.sigRightSub || 'BSGUP Lucknow', WIDTH * 0.75, sigY + 65);
 };
 
 /**

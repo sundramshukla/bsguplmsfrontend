@@ -92,13 +92,25 @@ const StudentDashboard = ({ onLogout }) => {
             onClick={() => handleTabClick('dept_adult')}
             className={`w-full text-left px-4 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center gap-3 ${activeTab === 'dept_adult' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 translate-x-1' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
           >
-            <span>👔</span> Adult Programme
+            <span>🎖️</span> Adult Programme
           </button>
           <button 
             onClick={() => handleTabClick('dept_tech')}
             className={`w-full text-left px-4 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center gap-3 ${activeTab === 'dept_tech' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 translate-x-1' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
           >
             <span>💻</span> Tech Skill
+          </button>
+          <button 
+            onClick={() => handleTabClick('dept_training')}
+            className={`w-full text-left px-4 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center gap-3 ${activeTab === 'dept_training' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 translate-x-1' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+          >
+            <span>🏋️‍♂️</span> Training Dept
+          </button>
+          <button 
+            onClick={() => handleTabClick('dept_org')}
+            className={`w-full text-left px-4 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center gap-3 ${activeTab === 'dept_org' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 translate-x-1' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+          >
+            <span>🏢</span> Organization Dept
           </button>
           
           <div className="pt-4 pb-2">
@@ -135,9 +147,12 @@ const StudentDashboard = ({ onLogout }) => {
         <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
             {activeTab === 'analytics' && <StudentAnalytics onNavigate={handleTabClick} />}
             {activeTab === 'enrolled' && <StudentEnrolledCourses />}
-            {(activeTab === 'dept_youth' || activeTab === 'dept_training') && <StudentDepartmentCourses department="youth_programme" title="Youth Programme" />}
-            {(activeTab === 'dept_adult' || activeTab === 'dept_org') && <StudentDepartmentCourses department="adult_programme" title="Adult Programme" />}
-            {(activeTab === 'dept_tech' || activeTab === 'dept_it') && <StudentDepartmentCourses department="tech_skill" title="Tech Skill" />}
+            {activeTab === 'dept_youth' && <StudentDepartmentCourses department="youth_programme" title="Youth Programme" />}
+            {activeTab === 'dept_adult' && <StudentDepartmentCourses department="adult_programme" title="Adult Programme" />}
+            {activeTab === 'dept_tech' && <StudentDepartmentCourses department="tech_skill" title="Tech Skill Department" />}
+            {activeTab === 'dept_training' && <StudentDepartmentCourses department="training" title="Training Department" />}
+            {activeTab === 'dept_org' && <StudentDepartmentCourses department="organisation" title="Organization Department" />}
+            {activeTab === 'dept_it' && <StudentDepartmentCourses department="tech_skill" title="Tech Skill Department" />}
             {activeTab === 'profile' && <StudentProfile />}
             {activeTab === 'payment' && <StudentPaymentHistory />}
             {activeTab === 'contact' && <StudentContact />}

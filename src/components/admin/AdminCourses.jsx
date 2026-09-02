@@ -1,28 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { BASE_URL } from '../../config';
-import { getAdminUserId } from '../../utils/quizUtils';
-
-const DEPARTMENTS_MAP = {
-  youth_programme: 'Youth Programme',
-  adult_programme: 'Adult Programme',
-  tech_skill: 'Tech Skill',
-  training: 'Youth Programme',
-  organisation: 'Adult Programme',
-  organization: 'Adult Programme',
-  it: 'Tech Skill'
-};
-
-const normalizeDepartmentKey = (dept) => {
-  if (!dept) return 'youth_programme';
-  const lower = dept.toLowerCase().trim();
-  if (['youth_programme', 'adult_programme', 'tech_skill'].includes(lower)) {
-    return lower;
-  }
-  if (lower === 'training') return 'youth_programme';
-  if (lower === 'organisation' || lower === 'organization') return 'adult_programme';
-  if (lower === 'it') return 'tech_skill';
-  return 'youth_programme';
-};
 
 const AdminCourses = () => {
   const [courses, setCourses] = useState([]);
@@ -100,14 +77,16 @@ const AdminCourses = () => {
         title: course.title,
         description: course.description,
         priceAmount: course.price,
-        priceCurrency: '₹',
+        priceCurrency: '₹', // Assuming existing amounts are INR for now
         isFree: course.price == 0 || course.price == '0' || course.price == '0.00',
         durationValue: durVal,
         durationUnit: durUnit,
         durationHours: dHours,
         durationMinutes: dMins,
         durationSeconds: dSecs,
-        department: normalizeDepartmentKey(course.department),
+        department: course.department
+          ? course.department.toLowerCase()
+          : 'youth_programme',
         user: course.user || ''
       });
     } else {
@@ -127,7 +106,8 @@ const AdminCourses = () => {
     const fd = new FormData();
     fd.append('title', formData.title);
     fd.append('description', formData.description);
-    fd.append('price', formData.isFree ? 0 : formData.priceAmount);
+    fd.append('price', formData.isFree ? 0 : formData.priceAmount); // Assuming backend expects pure amount
+    // If backend wanted currency, we'd do fd.append('currency', formData.priceCurrency);
 
     let finalDuration = '';
     if (formData.durationUnit === 'time') {
@@ -136,14 +116,14 @@ const AdminCourses = () => {
       if (formData.durationMinutes) parts.push(`${formData.durationMinutes} min`);
       if (formData.durationSeconds) parts.push(`${formData.durationSeconds} sec`);
       finalDuration = parts.join(' ');
-      if (!finalDuration) finalDuration = '0 hr';
+      if (!finalDuration) finalDuration = '0 hr'; // fallback
     } else {
       finalDuration = `${formData.durationValue} ${formData.durationUnit}`;
     }
     fd.append('duration', finalDuration);
 
     fd.append('department', formData.department);
-    const userId = getAdminUserId();
+    const userId = localStorage.getItem('adminUserId') || localStorage.getItem('userId') || formData.user || '1';
 
     if (isEditing) {
       fd.append('user_id', userId);
@@ -168,18 +148,18 @@ const AdminCourses = () => {
         setShowForm(false);
         fetchCourses();
       } else {
-        alert(data.error || 'Failed to save course.');
+        alert('Action failed');
       }
     } catch (err) {
       console.error(err);
-      alert('Error connecting to server.');
+      alert('Error saving course');
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this course?')) return;
+    if (!window.confirm("Are you sure you want to delete this course?")) return;
     try {
-      const adminUserId = getAdminUserId();
+      const adminUserId = localStorage.getItem('adminUserId') || localStorage.getItem('userId') || '32';
       const res = await fetch(`${BASE_URL}/bsgupadmin/createcourse/?course_id=${id}&user_id=${adminUserId}`, {
         method: 'DELETE'
       });
@@ -187,64 +167,49 @@ const AdminCourses = () => {
       if (data.success) {
         alert(data.success);
         fetchCourses();
-      } else {
-        alert(data.error || 'Failed to delete course.');
       }
     } catch (err) {
       console.error(err);
-      alert('Error connecting to server.');
+      alert('Error deleting course');
     }
   };
 
   return (
-    <div className="p-6 text-left">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-3xl font-extrabold text-slate-800">Manage Courses</h2>
-          <p className="text-sm text-slate-500 mt-1">Add, update, or remove courses and assign them to departments.</p>
-        </div>
-        <button
-          onClick={() => handleOpenForm()}
-          className="bg-[#7c3aed] text-white px-5 py-2.5 rounded-xl font-semibold shadow hover:bg-[#6d28d9] transition-colors"
-        >
-          + Add Course
+    <div className="p-4 md:p-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <h2 className="text-3xl font-bold text-slate-800">Manage Courses</h2>
+        <button onClick={() => handleOpenForm()} className="w-full sm:w-auto bg-[#7c3aed] text-white px-5 py-2.5 rounded-lg shadow-md hover:bg-[#6d28d9] font-medium transition-colors text-center">
+          + Add New Course
         </button>
       </div>
 
       {showForm && (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-8 max-w-2xl text-left">
-          <h3 className="text-xl font-bold text-slate-800 mb-4">{editingCourse ? 'Edit Course' : 'Create New Course'}</h3>
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
+        <div className="bg-white p-6 rounded-xl shadow-lg mb-8 border border-slate-200">
+          <h3 className="text-xl font-bold mb-6 pb-2 border-b text-slate-700">{editingCourse ? 'Edit Course Details' : 'Create New Course'}</h3>
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1">Title</label>
               <input type="text" name="title" value={formData.title} onChange={handleChange} required className="w-full border border-slate-300 p-2.5 rounded focus:ring-2 focus:ring-[#7c3aed] focus:outline-none" />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Price (₹)</label>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  name="priceAmount"
-                  value={formData.isFree ? '0' : formData.priceAmount}
-                  onChange={handleChange}
-                  disabled={formData.isFree}
-                  required={!formData.isFree}
-                  placeholder="e.g. 499"
-                  className="w-full border border-slate-300 p-2.5 rounded focus:ring-2 focus:ring-[#7c3aed] focus:outline-none disabled:bg-slate-100"
-                />
-              </div>
-              <div className="mt-1">
-                <label className="inline-flex items-center text-sm text-slate-600 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    name="isFree"
-                    checked={formData.isFree}
-                    onChange={handleChange}
-                    className="rounded border-slate-300 text-[#7c3aed] focus:ring-[#7c3aed] mr-2"
-                  />
-                  Mark as Free Course
-                </label>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">Price</label>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" name="isFree" id="isFree" checked={formData.isFree} onChange={handleChange} className="w-4 h-4 text-[#7c3aed] focus:ring-[#7c3aed] border-slate-300 rounded" />
+                  <label htmlFor="isFree" className="text-sm font-medium text-slate-700">Free Course</label>
+                </div>
+                {!formData.isFree && (
+                  <div className="flex">
+                    <select name="priceCurrency" value={formData.priceCurrency} onChange={handleChange} className="border border-slate-300 border-r-0 rounded-l p-2.5 bg-slate-50 focus:ring-2 focus:ring-[#7c3aed] focus:outline-none focus:z-10">
+                      <option value="₹">Rupees (₹)</option>
+                      <option value="$">Dollars ($)</option>
+                      <option value="€">Euros (€)</option>
+                      <option value="£">Pounds (£)</option>
+                    </select>
+                    <input type="number" name="priceAmount" placeholder="Amount" value={formData.priceAmount} onChange={handleChange} required={!formData.isFree} className="w-full border border-slate-300 p-2.5 rounded-r focus:ring-2 focus:ring-[#7c3aed] focus:outline-none" />
+                  </div>
+                )}
               </div>
             </div>
 
@@ -252,50 +217,27 @@ const AdminCourses = () => {
               <label className="block text-sm font-semibold text-slate-700 mb-1">Duration</label>
               <div className="flex gap-2">
                 {formData.durationUnit === 'time' ? (
-                  <div className="flex gap-1 w-full">
-                    <input
-                      type="number"
-                      name="durationHours"
-                      value={formData.durationHours}
-                      onChange={handleChange}
-                      placeholder="Hrs"
-                      className="w-1/3 border border-slate-300 p-2 rounded focus:ring-2 focus:ring-[#7c3aed] focus:outline-none text-sm"
-                    />
-                    <input
-                      type="number"
-                      name="durationMinutes"
-                      value={formData.durationMinutes}
-                      onChange={handleChange}
-                      placeholder="Mins"
-                      className="w-1/3 border border-slate-300 p-2 rounded focus:ring-2 focus:ring-[#7c3aed] focus:outline-none text-sm"
-                    />
-                    <input
-                      type="number"
-                      name="durationSeconds"
-                      value={formData.durationSeconds}
-                      onChange={handleChange}
-                      placeholder="Secs"
-                      className="w-1/3 border border-slate-300 p-2 rounded focus:ring-2 focus:ring-[#7c3aed] focus:outline-none text-sm"
-                    />
+                  <div className="flex w-3/4 gap-1">
+                    <div className="flex flex-col w-1/3">
+                      <input type="number" name="durationHours" placeholder="HH" value={formData.durationHours} onChange={handleChange} min="0" className="border border-slate-300 p-2.5 rounded focus:ring-2 focus:ring-[#7c3aed] focus:outline-none" />
+                      <span className="text-xs text-center text-slate-500 mt-1">Hours</span>
+                    </div>
+                    <span className="self-center font-bold">:</span>
+                    <div className="flex flex-col w-1/3">
+                      <input type="number" name="durationMinutes" placeholder="MM" value={formData.durationMinutes} onChange={handleChange} min="0" max="59" className="border border-slate-300 p-2.5 rounded focus:ring-2 focus:ring-[#7c3aed] focus:outline-none" />
+                      <span className="text-xs text-center text-slate-500 mt-1">Mins</span>
+                    </div>
+                    <span className="self-center font-bold">:</span>
+                    <div className="flex flex-col w-1/3">
+                      <input type="number" name="durationSeconds" placeholder="SS" value={formData.durationSeconds} onChange={handleChange} min="0" max="59" className="border border-slate-300 p-2.5 rounded focus:ring-2 focus:ring-[#7c3aed] focus:outline-none" />
+                      <span className="text-xs text-center text-slate-500 mt-1">Secs</span>
+                    </div>
                   </div>
                 ) : (
-                  <input
-                    type="number"
-                    name="durationValue"
-                    value={formData.durationValue}
-                    onChange={handleChange}
-                    required
-                    placeholder="e.g. 3"
-                    className="w-1/2 border border-slate-300 p-2.5 rounded focus:ring-2 focus:ring-[#7c3aed] focus:outline-none"
-                  />
+                  <input type="number" name="durationValue" placeholder="E.g. 3" value={formData.durationValue} onChange={handleChange} required min="1" className="w-[48%] border border-slate-300 p-2.5 rounded focus:ring-2 focus:ring-[#7c3aed] focus:outline-none" />
                 )}
-                <select
-                  name="durationUnit"
-                  value={formData.durationUnit}
-                  onChange={handleChange}
-                  className="w-1/2 border border-slate-300 p-2.5 rounded focus:ring-2 focus:ring-[#7c3aed] focus:outline-none"
-                >
-                  <option value="time">Time (Hr/Min/Sec)</option>
+                <select name="durationUnit" value={formData.durationUnit} onChange={handleChange} className={`${formData.durationUnit === 'time' ? 'w-1/4' : 'w-[48%]'} self-start border border-slate-300 p-2.5 rounded focus:ring-2 focus:ring-[#7c3aed] focus:outline-none`}>
+                  <option value="time">Time</option>
                   <option value="days">Days</option>
                   <option value="weeks">Weeks</option>
                   <option value="months">Months</option>
@@ -306,16 +248,13 @@ const AdminCourses = () => {
 
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1">Department</label>
-              <select
-                name="department"
-                value={formData.department}
-                onChange={handleChange}
-                required
-                className="w-full border border-slate-300 p-2.5 rounded focus:ring-2 focus:ring-[#7c3aed] focus:outline-none font-medium text-slate-700"
-              >
+              <select name="department" value={formData.department} onChange={handleChange} required className="w-full border border-slate-300 p-2.5 rounded focus:ring-2 focus:ring-[#7c3aed] focus:outline-none bg-white">
                 <option value="youth_programme">Youth Programme</option>
                 <option value="adult_programme">Adult Programme</option>
                 <option value="tech_skill">Tech Skill</option>
+                <option value="training">Training</option>
+                <option value="organisation">Organization</option>
+                <option value="it">IT</option>
               </select>
             </div>
 
@@ -349,15 +288,11 @@ const AdminCourses = () => {
                 <div className="w-full h-44 bg-slate-200 flex items-center justify-center text-slate-400">No Image provided</div>
               )}
               <div className="p-5 flex-grow text-left">
-                <div className="mb-2">
-                  <span className="inline-block bg-purple-50 text-purple-700 border border-purple-200 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
-                    {DEPARTMENTS_MAP[course.department] || 'Youth Programme'}
-                  </span>
-                </div>
                 <h4 className="text-lg font-bold text-slate-800 mb-2 leading-tight">{course.title}</h4>
                 <p className="text-sm text-slate-600 mb-4 line-clamp-2">{course.description}</p>
                 <div className="flex justify-between items-center text-sm font-semibold bg-slate-50 p-2 rounded border border-slate-100">
                   <span className="text-[#7c3aed]">
+                    {/* Display standard Rupee symbol format for display regardless of currency option missing from backend string */}
                     {course.price == 0 || course.price == '0' || course.price == '0.00' ? 'Free' : `₹${course.price}`}
                   </span>
                   <span className="text-slate-500">{course.duration}</span>

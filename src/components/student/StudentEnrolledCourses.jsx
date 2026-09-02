@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { BASE_URL } from '../../config';
 import { fetchQuizForCourse, getCourseQuizId, fetchQuizForLesson } from '../../utils/quizUtils';
+import { generateCertificatePdf, saveCertificateToBackend } from '../../utils/certificateUtils';
 import { getEnrolledCourseIds } from '../../utils/enrollmentUtils';
 import {
   processCourseEnrollment,
   navigateToPaymentResult,
   appendLocalPaymentHistory
 } from '../../utils/paymentUtils';
-import { generateCertificatePdf, saveCertificateToBackend } from '../../utils/certificateUtils';
 import Loader from '../Loader';
 
 const YouTubePlayer = ({ url, title, courseId, partNum, onVideoEnd }) => {
@@ -397,83 +397,64 @@ const StudentEnrolledCourses = () => {
   const [studentName, setStudentName] = useState('Sundram Shukla');
   const [studentDistrict, setStudentDistrict] = useState('');
   const [certificateNumber, setCertificateNumber] = useState('');
+  const [certificateFileUrl, setCertificateFileUrl] = useState('');
+  const [isGeneratingCert, setIsGeneratingCert] = useState(false);
   const [showCertificate, setShowCertificate] = useState(false);
-  const [pdfGenerating, setPdfGenerating] = useState(false);
 
-  const handleDownloadPdf = async () => {
-    const courseId = activeCourse.id ? activeCourse.id.toString() : '';
-    const dept = (activeCourse.department || 'training').toLowerCase();
-    const customTemplateStr =
-      localStorage.getItem(`certificate_template_${courseId}`) ||
-      localStorage.getItem('certificate_template_default') ||
-      localStorage.getItem(`certificate_template_${dept}`);
-    const templateConfig = customTemplateStr ? JSON.parse(customTemplateStr) : {};
+  // Load saved certificate metadata when active course changes
+  useEffect(() => {
+    if (activeCourse) {
+      const userId = localStorage.getItem('userId') || '2';
+      const savedCertMeta = localStorage.getItem(`certificate_meta_${userId}_${activeCourse.id}`);
+      if (savedCertMeta) {
+        try {
+          const parsed = JSON.parse(savedCertMeta);
+          if (parsed.student_name) setStudentName(parsed.student_name);
+          if (parsed.district) setStudentDistrict(parsed.district);
+          if (parsed.certificate_number) setCertificateNumber(parsed.certificate_number);
+        } catch (e) {}
+      }
+      const savedCertUrl = localStorage.getItem(`certificate_url_${userId}_${activeCourse.id}`);
+      if (savedCertUrl) {
+        setCertificateFileUrl(savedCertUrl);
+      }
+    }
+  }, [activeCourse]);
 
-    setPdfGenerating(true);
+  const handleDownloadCertificate = async () => {
     try {
-      const { pdf, file } = await generateCertificatePdf({
-        studentName,
-        district: studentDistrict,
-        certificateNumber,
-        courseTitle: activeCourse.title,
+      const courseId = activeCourse?.id ? activeCourse.id.toString() : '';
+      const dept = (activeCourse?.department || 'youth_programme').toLowerCase();
+      const customTemplateStr = localStorage.getItem(`certificate_template_${courseId}`) || localStorage.getItem(`certificate_template_${dept}`);
+      let templateConfig = {};
+      if (customTemplateStr) {
+        try {
+          templateConfig = JSON.parse(customTemplateStr);
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      const { pdf } = await generateCertificatePdf({
+        studentName: studentName || 'Sundram Shukla',
+        district: studentDistrict || '',
+        certificateNumber: certificateNumber || `CERT-${Date.now()}`,
+        courseTitle: activeCourse?.title || 'BSGUP Course',
         templateConfig
       });
-      pdf.save(`${certificateNumber || 'Certificate'}.pdf`);
 
-      const userId = localStorage.getItem('userId') || 1;
-      if (certificateNumber) {
-        await saveCertificateToBackend({
-          userId,
-          certificateNumber,
-          pdfFile: file
-        });
-      }
+      pdf.save(`${certificateNumber || 'BSGUP_Certificate'}.pdf`);
     } catch (err) {
-      console.error("PDF download fallback to print:", err);
+      console.error("Failed to generate PDF, falling back to print window:", err);
       handlePrintCertificate();
-    } finally {
-      setPdfGenerating(false);
     }
   };
 
   const handlePrintCertificate = () => {
     const courseId = activeCourse.id ? activeCourse.id.toString() : '';
     const dept = (activeCourse.department || 'training').toLowerCase();
-    const customTemplateStr =
-      localStorage.getItem(`certificate_template_${courseId}`) ||
-      localStorage.getItem('certificate_template_default') ||
-      localStorage.getItem(`certificate_template_${dept}`);
-
+    const customTemplateStr = localStorage.getItem(`certificate_template_${courseId}`) || localStorage.getItem(`certificate_template_${dept}`);
     let template = {
-      bgImageBase64: '',
-      namePositionX: 50,
-      namePositionY: 50,
-      nameFontSize: 40,
-      nameFontFamily: 'Pinyon Script',
-      nameColor: '#1e293b',
-      nameFontWeight: 'bold',
-      nameUnderline: false,
-      showDistrict: true,
-      districtPositionX: 50,
-      districtPositionY: 56,
-      districtFontSize: 14,
-      districtColor: '#334155',
-      showDate: false,
-      datePositionX: 25,
-      datePositionY: 80,
-      dateFontSize: 13,
-      dateColor: '#475569',
-      showCertId: true,
-      certIdPositionX: 75,
-      certIdPositionY: 80,
-      certIdFontSize: 13,
-      certIdColor: '#475569',
-      showCourseTitle: false,
-      courseTitlePositionX: 50,
-      courseTitlePositionY: 62,
-      courseTitleFontSize: 18,
-      courseTitleColor: '#047857',
-      // Fallback
       title: 'THE BHARAT SCOUTS & GUIDES',
       subHeader: 'Uttar Pradesh State Headquarters',
       certificationText: 'This is to certify that',
@@ -482,9 +463,11 @@ const StudentEnrolledCourses = () => {
       sigLeftSub: 'BSGUP Head Office',
       sigRightTitle: 'State Secretary',
       sigRightSub: 'BSGUP Lucknow',
-      textColor: '#1e293b'
+      textColor: '#1e293b',
+      bgImageBase64: '',
+      sigLeftImageBase64: '',
+      sigRightImageBase64: ''
     };
-
     if (customTemplateStr) {
       try {
         const parsed = JSON.parse(customTemplateStr);
@@ -494,182 +477,169 @@ const StudentEnrolledCourses = () => {
       }
     }
 
-    const hasBgImage = Boolean(template.bgImageBase64);
-    const issueDate = new Date().toLocaleDateString('en-GB');
-    const certNumber = `BSGUP-${courseId || '101'}-${new Date().getFullYear()}`;
-
     const newWindow = window.open("", "_blank");
-    if (!newWindow) {
-      alert("Please allow popups to download your certificate.");
-      return;
-    }
-
     newWindow.document.write(`
-      <!DOCTYPE html>
       <html>
         <head>
           <title>BSGUP Course Certificate - ${studentName}</title>
-          <meta charset="utf-8" />
           <style>
-            @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Great+Vibes&family=Inter:wght@400;600;700;800&family=Pinyon+Script&family=Playfair+Display:ital,wght@0,600;0,800;1,600&display=swap');
-            
-            @page {
-              size: landscape;
-              margin: 0;
-            }
-            
-            * {
-              box-sizing: border-box;
-            }
-
+            @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Inter:wght@400;600;800&family=Pinyon+Script&display=swap');
             body {
               margin: 0;
-              padding: 0;
+              padding: 20px;
               display: flex;
               justify-content: center;
               align-items: center;
-              min-height: 100vh;
-              background-color: #f1f5f9;
+              min-height: 90vh;
+              background-color: #fff;
               font-family: 'Inter', sans-serif;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
             }
-
-            .certificate-wrapper {
-              width: 1000px;
-              height: 707px;
-              position: relative;
-              background-color: #ffffff;
-              overflow: hidden;
-              box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-              ${hasBgImage ? `background-image: url(${template.bgImageBase64}); background-size: 100% 100%; background-position: center; background-repeat: no-repeat;` : ''}
-            }
-
-            @media print {
-              body {
-                background: none;
-                min-height: auto;
-              }
-              .certificate-wrapper {
-                width: 100vw;
-                height: 100vh;
-                box-shadow: none;
-              }
-            }
-
-            /* Custom dynamic student name */
-            .student-name-overlay {
-              position: absolute;
-              left: ${template.namePositionX || 50}%;
-              top: ${template.namePositionY || 50}%;
-              transform: translate(-50%, -50%);
-              font-family: '${template.nameFontFamily || 'Pinyon Script'}', cursive, serif;
-              font-size: ${template.nameFontSize ? template.nameFontSize * 1.3 : 48}px;
-              color: ${template.nameColor || '#1e293b'};
-              font-weight: ${template.nameFontWeight || 'bold'};
-              text-decoration: ${template.nameUnderline ? 'underline' : 'none'};
-              white-space: nowrap;
-              text-align: center;
-              z-index: 10;
-            }
-
-            .date-overlay {
-              position: absolute;
-              left: ${template.datePositionX || 25}%;
-              top: ${template.datePositionY || 80}%;
-              transform: translate(-50%, -50%);
-              font-size: ${template.dateFontSize ? template.dateFontSize * 1.2 : 14}px;
-              color: ${template.dateColor || '#475569'};
-              font-weight: 600;
-              z-index: 10;
-            }
-
-            .certid-overlay {
-              position: absolute;
-              left: ${template.certIdPositionX || 75}%;
-              top: ${template.certIdPositionY || 80}%;
-              transform: translate(-50%, -50%);
-              font-size: ${template.certIdFontSize ? template.certIdFontSize * 1.2 : 14}px;
-              color: ${template.certIdColor || '#475569'};
-              font-weight: 600;
-              z-index: 10;
-            }
-
-            .course-overlay {
-              position: absolute;
-              left: ${template.courseTitlePositionX || 50}%;
-              top: ${template.courseTitlePositionY || 62}%;
-              transform: translate(-50%, -50%);
-              font-size: ${template.courseTitleFontSize ? template.courseTitleFontSize * 1.2 : 20}px;
-              color: ${template.courseTitleColor || '#047857'};
-              font-weight: 800;
-              z-index: 10;
-            }
-
-            /* Classic Fallback Layout if NO custom template image is uploaded */
-            .classic-inner {
-              position: absolute;
-              inset: 20px;
-              border: 8px solid #fbbf24;
+            .certificate-container {
+              border: ${template.bgImageBase64 ? 'none' : '8px solid #fbbf24'};
               padding: 10px;
-              display: flex;
-              flex-direction: column;
-              justify-content: space-between;
+              width: 100%;
+              max-width: 700px;
+              box-sizing: border-box;
+              background-image: ${template.bgImageBase64 ? `url(${template.bgImageBase64})` : 'none'};
+              background-size: cover;
+              background-position: center;
+            }
+            .certificate-content {
+              border: ${template.bgImageBase64 ? 'none' : '4px dashed #0f172a'};
+              border-radius: 8px;
+              padding: 40px 30px;
               text-align: center;
               box-sizing: border-box;
+              color: ${template.textColor};
             }
-            .classic-border {
-              border: 4px dashed #0f172a;
-              border-radius: 8px;
-              padding: 30px;
-              height: 100%;
+            .gold-star {
+              font-size: 48px;
+              margin-bottom: 10px;
+              display: ${template.bgImageBase64 ? 'none' : 'block'};
+            }
+            .title {
+              font-family: 'Cinzel', serif;
+              font-size: 26px;
+              font-weight: 900;
+              color: ${template.textColor};
+              letter-spacing: 2px;
+              margin: 0 0 5px 0;
+            }
+            .subtitle {
+              font-size: 12px;
+              font-weight: 800;
+              color: ${template.textColor === '#1e293b' || template.textColor === '#000000' ? '#d97706' : 'inherit'};
+              opacity: 0.9;
+              letter-spacing: 3px;
+              text-transform: uppercase;
+              margin-bottom: 25px;
+            }
+            .italic-text {
+              font-size: 12px;
+              font-style: italic;
+              font-weight: 600;
+              color: ${template.textColor};
+              opacity: 0.8;
+            }
+            .student-name {
+              font-family: 'Pinyon Script', cursive;
+              font-size: 48px;
+              font-weight: bold;
+              color: ${template.textColor};
+              margin: 20px 0;
+              text-decoration: underline;
+              text-decoration-style: double;
+              text-decoration-color: ${template.textColor === '#1e293b' || template.textColor === '#000000' ? '#fbbf24' : 'currentColor'};
+            }
+            .desc {
+              font-size: 13px;
+              color: ${template.textColor};
+              opacity: 0.9;
+              max-width: 480px;
+              margin: 0 auto 25px auto;
+              line-height: 1.6;
+            }
+            .course-title {
+              font-size: 18px;
+              font-weight: 800;
+              color: #047857;
+              background-color: #ecfdf5;
+              padding: 10px 28px;
+              border-radius: 9999px;
+              display: inline-block;
+              margin-bottom: 35px;
+            }
+            .signatures {
+              display: grid;
+              grid-template-cols: 1fr 1fr;
+              gap: 40px;
+              max-width: 450px;
+              margin: 0 auto;
+              border-top: 1px solid #e2e8f0;
+              padding-top: 20px;
+            }
+            .signature-img-container {
+              height: 40px;
               display: flex;
-              flex-direction: column;
-              justify-content: space-between;
-              box-sizing: border-box;
+              align-items: end;
+              justify-content: center;
+              margin-bottom: 4px;
+            }
+            .signature-img {
+              max-height: 100%;
+              max-width: 120px;
+              object-fit: contain;
+            }
+            .signature-title {
+              font-size: 13px;
+              font-style: italic;
+              font-weight: 600;
+              color: ${template.textColor};
+              margin-bottom: 5px;
+            }
+            .signature-line {
+              width: 120px;
+              border-bottom: 1px solid #94a3b8;
+              margin: 0 auto;
+            }
+            .signature-subtitle {
+              font-size: 10px;
+              color: #94a3b8;
+              margin-top: 5px;
+              font-weight: 800;
             }
           </style>
         </head>
         <body>
-          <div class="certificate-wrapper">
-            ${hasBgImage ? `
-              <div class="student-name-overlay">${studentName}</div>
-              ${template.showDate ? `<div class="date-overlay">Date: ${issueDate}</div>` : ''}
-              ${template.showCertId ? `<div class="certid-overlay">Certificate No: ${certNumber}</div>` : ''}
-              ${template.showCourseTitle ? `<div class="course-overlay">${activeCourse.title}</div>` : ''}
-            ` : `
-              <div class="classic-inner">
-                <div class="classic-border">
-                  <div>
-                    <div style="font-size: 40px; margin-bottom: 5px;">⚜️</div>
-                    <div style="font-family: 'Cinzel', serif; font-size: 28px; font-weight: 900; letter-spacing: 2px; color: ${template.textColor};">${template.title}</div>
-                    <div style="font-size: 13px; font-weight: 800; color: #d97706; letter-spacing: 3px; text-transform: uppercase; margin-top: 5px; margin-bottom: 20px;">${template.subHeader}</div>
-                    <div style="font-size: 13px; font-style: italic; font-weight: 600; color: ${template.textColor}; opacity: 0.8;">${template.certificationText}</div>
-                    <div style="font-family: '${template.nameFontFamily || 'Pinyon Script'}', cursive; font-size: 52px; font-weight: bold; color: ${template.nameColor || template.textColor}; margin: 15px 0;">${studentName}</div>
-                    <div style="font-size: 14px; max-width: 550px; margin: 0 auto 20px auto; color: ${template.textColor}; line-height: 1.5;">${template.descriptionText}</div>
-                    <div style="font-size: 18px; font-weight: 800; color: #047857; background-color: #ecfdf5; padding: 8px 24px; border-radius: 9999px; display: inline-block;">${activeCourse.title}</div>
-                  </div>
-                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; max-width: 500px; margin: 0 auto; border-top: 1px solid #e2e8f0; padding-top: 15px;">
-                    <div>
-                      <div style="width: 140px; border-bottom: 1px solid #94a3b8; margin: 25px auto 5px auto;"></div>
-                      <div style="font-size: 12px; font-weight: 600; font-style: italic;">${template.sigLeftTitle}</div>
-                      <div style="font-size: 10px; color: #94a3b8; font-weight: 800;">${template.sigLeftSub}</div>
-                    </div>
-                    <div>
-                      <div style="width: 140px; border-bottom: 1px solid #94a3b8; margin: 25px auto 5px auto;"></div>
-                      <div style="font-size: 12px; font-weight: 600; font-style: italic;">${template.sigRightTitle}</div>
-                      <div style="font-size: 10px; color: #94a3b8; font-weight: 800;">${template.sigRightSub}</div>
-                    </div>
-                  </div>
+          <div class="certificate-container">
+            <div class="certificate-content">
+              <div class="gold-star">⚜️</div>
+              <div class="title">${template.title}</div>
+              <div class="subtitle">${template.subHeader}</div>
+              <div class="italic-text">${template.certificationText}</div>
+              <div class="student-name">${studentName}</div>
+              <div class="desc">${template.descriptionText}</div>
+              <div class="course-title">${activeCourse.title}</div>
+              <div class="signatures">
+                <div style="display: flex; flex-direction: column; justify-content: flex-end; min-height: 70px;">
+                  ${template.sigLeftImageBase64 ? '<div class="signature-img-container"><img class="signature-img" src="' + template.sigLeftImageBase64 + '" alt="Left Signature" /></div>' : '<div class="signature-img-container"></div>'}
+                  <div class="signature-line"></div>
+                  <div class="signature-title">${template.sigLeftTitle}</div>
+                  <div class="signature-subtitle">${template.sigLeftSub}</div>
+                </div>
+                <div style="display: flex; flex-direction: column; justify-content: flex-end; min-height: 70px;">
+                  ${template.sigRightImageBase64 ? '<div class="signature-img-container"><img class="signature-img" src="' + template.sigRightImageBase64 + '" alt="Right Signature" /></div>' : '<div class="signature-img-container"></div>'}
+                  <div class="signature-line"></div>
+                  <div class="signature-title">${template.sigRightTitle}</div>
+                  <div class="signature-subtitle">${template.sigRightSub}</div>
                 </div>
               </div>
-            `}
+            </div>
           </div>
           <script>
             window.onload = function() {
-              setTimeout(function() {
-                window.print();
-              }, 500);
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
             };
           </script>
         </body>
@@ -1134,7 +1104,7 @@ const StudentEnrolledCourses = () => {
         return;
       }
 
-      const userId = localStorage.getItem('userId') || 3;
+      const userId = localStorage.getItem('userId') || '2';
       const quizId = quizObj.quizId || getCourseQuizId(activeCourse.id);
       if (!quizId) {
         alert('Quiz not configured for this course. Please ask admin to open Quiz Management once.');
@@ -1143,7 +1113,7 @@ const StudentEnrolledCourses = () => {
       }
 
       try {
-        await fetch(`${BASE_URL}/bsgupadmin/start-quiz/`, {
+        const startRes = await fetch(`${BASE_URL}/user/start-quiz/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1151,6 +1121,11 @@ const StudentEnrolledCourses = () => {
             quiz_id: parseInt(quizId, 10)
           })
         });
+        const startData = await startRes.json().catch(() => ({}));
+        const attemptId = startData.attempt_id || (startData.data && startData.data.attempt_id);
+        if (attemptId) {
+          setQuizAttemptId(attemptId);
+        }
       } catch (startErr) {
         console.error('Start quiz API failed, proceeding anyway', startErr);
       }
@@ -1183,29 +1158,24 @@ const StudentEnrolledCourses = () => {
 
     setQuizLoading(true);
     try {
-      const userId = localStorage.getItem('userId') || 3;
+      const userId = localStorage.getItem('userId') || '2';
       const formattedAnswers = Object.keys(selectedAnswers).map(idxKey => {
         const questionIndex = parseInt(idxKey, 10);
         const questionObj = questionsList[questionIndex] || {};
         return {
           question_id: parseInt(questionObj.id || questionObj.question_id || questionIndex, 10),
-          answer: selectedAnswers[idxKey]
+          selected_answer: selectedAnswers[idxKey]
         };
       });
-      const cachedQuizId = getCourseQuizId(activeCourse.id);
-      if (!cachedQuizId) {
-        alert('Quiz not configured for this course.');
-        setQuizLoading(false);
-        return;
-      }
 
-      // 1. Submit to API
-      const res = await fetch(`${BASE_URL}/bsgupadmin/submit-quiz/`, {
-        method: 'POST',
+      const attemptId = quizAttemptId || 1;
+
+      // 1. Submit to API: PUT /user/start-quiz/
+      const res = await fetch(`${BASE_URL}/user/start-quiz/`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user_id: parseInt(userId, 10),
-          quiz_id: parseInt(cachedQuizId, 10),
+          attempt_id: parseInt(attemptId, 10),
           answers: formattedAnswers
         })
       });
@@ -1218,8 +1188,57 @@ const StudentEnrolledCourses = () => {
         const resultData = await res.json();
         backendMessage = resultData.message || (resultData.data && resultData.data.message) || "";
         if (resultData && resultData.success && resultData.data) {
-          finalScorePercentage = Math.round(resultData.data.percentage);
-          passed = resultData.data.passed === true || resultData.data.passed === "true";
+          finalScorePercentage = Math.round(resultData.data.percentage ?? 100);
+          passed = resultData.data.passed === true || resultData.data.passed === "true" || finalScorePercentage >= (quizData.passing_marks || 60);
+
+          if (passed && resultData.data.certificate) {
+            const cert = resultData.data.certificate;
+            const sName = cert.student_name || studentName || 'Sundram Shukla';
+            const sDist = cert.district || studentDistrict || '';
+            const sCertNum = cert.certificate_number || certificateNumber || `CERT-${Date.now()}`;
+
+            setStudentName(sName);
+            setStudentDistrict(sDist);
+            setCertificateNumber(sCertNum);
+
+            const certMeta = { student_name: sName, district: sDist, certificate_number: sCertNum };
+            localStorage.setItem(`certificate_meta_${userId}_${activeCourse.id}`, JSON.stringify(certMeta));
+
+            // Auto-generate PDF & save to backend
+            try {
+              setIsGeneratingCert(true);
+              const courseId = activeCourse.id.toString();
+              const dept = (activeCourse.department || 'youth_programme').toLowerCase();
+              const customTemplateStr = localStorage.getItem(`certificate_template_${courseId}`) || localStorage.getItem(`certificate_template_${dept}`);
+              let templateConfig = {};
+              if (customTemplateStr) {
+                try { templateConfig = JSON.parse(customTemplateStr); } catch (e) {}
+              }
+
+              const { pdf, file } = await generateCertificatePdf({
+                studentName: sName,
+                district: sDist,
+                certificateNumber: sCertNum,
+                courseTitle: activeCourse.title,
+                templateConfig
+              });
+
+              const saveRes = await saveCertificateToBackend({
+                userId: userId,
+                certificateNumber: sCertNum,
+                pdfFile: file
+              });
+
+              if (saveRes && saveRes.data && saveRes.data.certificate_file) {
+                setCertificateFileUrl(saveRes.data.certificate_file);
+                localStorage.setItem(`certificate_url_${userId}_${activeCourse.id}`, saveRes.data.certificate_file);
+              }
+            } catch (pdfErr) {
+              console.error("Auto certificate generation error:", pdfErr);
+            } finally {
+              setIsGeneratingCert(false);
+            }
+          }
         } else {
           // Local fallback in case API succeeded but data was malformed
           let score = 0;
@@ -1371,7 +1390,7 @@ const StudentEnrolledCourses = () => {
     if (!quizData) return;
     setQuizLoading(true);
     try {
-      const userId = localStorage.getItem('userId') || 3;
+      const userId = localStorage.getItem('userId') || '2';
       const res = await fetch(`${BASE_URL}/user/start-quiz/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1381,8 +1400,9 @@ const StudentEnrolledCourses = () => {
         })
       });
       const data = await res.json();
-      if (data.success && data.data && data.data.attempt_id) {
-        setQuizAttemptId(data.data.attempt_id);
+      const attemptId = data.attempt_id || (data.data && data.data.attempt_id);
+      if (data.success && attemptId) {
+        setQuizAttemptId(attemptId);
         setQuizStarted(true);
       } else {
         alert("Failed to start quiz attempt on server. Please try again.");
@@ -1404,24 +1424,23 @@ const StudentEnrolledCourses = () => {
 
     setQuizLoading(true);
     try {
-      const userId = localStorage.getItem('userId') || 3;
+      const userId = localStorage.getItem('userId') || '2';
       const formattedAnswers = Object.keys(selectedAnswers).map(idxKey => {
         const questionIndex = parseInt(idxKey, 10);
         const questionObj = questionsList[questionIndex] || {};
         return {
           question_id: parseInt(questionObj.id || questionObj.question_id || questionIndex, 10),
-          selected_answer: selectedAnswers[idxKey],
-          answer: selectedAnswers[idxKey]
+          selected_answer: selectedAnswers[idxKey]
         };
       });
+
+      const attemptId = quizAttemptId || 1;
 
       const res = await fetch(`${BASE_URL}/user/start-quiz/`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user_id: parseInt(userId, 10),
-          quiz_id: parseInt(quizData.quizId, 10),
-          attempt_id: parseInt(quizAttemptId, 10),
+          attempt_id: parseInt(attemptId, 10),
           answers: formattedAnswers
         })
       });
@@ -1429,8 +1448,8 @@ const StudentEnrolledCourses = () => {
       if (res.ok) {
         const resultData = await res.json();
         if (resultData.success && resultData.data) {
-          const finalScorePercentage = Math.round(resultData.data.percentage);
-          const passed = resultData.data.passed === true || resultData.data.passed === "true";
+          const finalScorePercentage = Math.round(resultData.data.percentage ?? 100);
+          const passed = resultData.data.passed === true || resultData.data.passed === "true" || finalScorePercentage >= (quizData.passing_marks || 60);
           
           setQuizResult({
             score: finalScorePercentage,
@@ -1438,57 +1457,53 @@ const StudentEnrolledCourses = () => {
             message: resultData.message || (resultData.data && resultData.data.message) || ""
           });
 
-          // Check if certificate data returned in quiz submission response
-          const certObj = resultData.data.certificate || resultData.certificate || null;
-          let currentCertNum = certificateNumber;
-          let currentStudName = studentName;
-          let currentDistrict = studentDistrict;
-
-          if (certObj) {
-            if (certObj.student_name) {
-              setStudentName(certObj.student_name);
-              currentStudName = certObj.student_name;
-            }
-            if (certObj.district) {
-              setStudentDistrict(certObj.district);
-              currentDistrict = certObj.district;
-            }
-            if (certObj.certificate_number) {
-              setCertificateNumber(certObj.certificate_number);
-              currentCertNum = certObj.certificate_number;
-            }
-
-            const courseId = activeCourse.id ? activeCourse.id.toString() : '';
-            localStorage.setItem(`earned_certificate_${courseId}_${userId}`, JSON.stringify(certObj));
-          }
-
           if (passed) {
-            // Auto generate & upload PDF certificate to /user/save-certificate/
-            if (currentCertNum) {
-              try {
-                const courseId = activeCourse.id ? activeCourse.id.toString() : '';
-                const dept = (activeCourse.department || 'training').toLowerCase();
-                const customTemplateStr =
-                  localStorage.getItem(`certificate_template_${courseId}`) ||
-                  localStorage.getItem('certificate_template_default') ||
-                  localStorage.getItem(`certificate_template_${dept}`);
-                const templateConfig = customTemplateStr ? JSON.parse(customTemplateStr) : {};
+            // Check if certificate data was returned (e.g. final lesson)
+            if (resultData.data.certificate) {
+              const cert = resultData.data.certificate;
+              const sName = cert.student_name || studentName || 'Sundram Shukla';
+              const sDist = cert.district || studentDistrict || '';
+              const sCertNum = cert.certificate_number || certificateNumber || `CERT-${Date.now()}`;
 
-                generateCertificatePdf({
-                  studentName: currentStudName,
-                  district: currentDistrict,
-                  certificateNumber: currentCertNum,
+              setStudentName(sName);
+              setStudentDistrict(sDist);
+              setCertificateNumber(sCertNum);
+
+              const certMeta = { student_name: sName, district: sDist, certificate_number: sCertNum };
+              localStorage.setItem(`certificate_meta_${userId}_${activeCourse.id}`, JSON.stringify(certMeta));
+
+              try {
+                setIsGeneratingCert(true);
+                const courseId = activeCourse.id.toString();
+                const dept = (activeCourse.department || 'youth_programme').toLowerCase();
+                const customTemplateStr = localStorage.getItem(`certificate_template_${courseId}`) || localStorage.getItem(`certificate_template_${dept}`);
+                let templateConfig = {};
+                if (customTemplateStr) {
+                  try { templateConfig = JSON.parse(customTemplateStr); } catch (e) {}
+                }
+
+                const { pdf, file } = await generateCertificatePdf({
+                  studentName: sName,
+                  district: sDist,
+                  certificateNumber: sCertNum,
                   courseTitle: activeCourse.title,
                   templateConfig
-                }).then(async ({ file }) => {
-                  await saveCertificateToBackend({
-                    userId,
-                    certificateNumber: currentCertNum,
-                    pdfFile: file
-                  });
-                }).catch(e => console.error("Auto cert upload error:", e));
-              } catch (e) {
-                console.error("Certificate auto-generation error:", e);
+                });
+
+                const saveRes = await saveCertificateToBackend({
+                  userId: userId,
+                  certificateNumber: sCertNum,
+                  pdfFile: file
+                });
+
+                if (saveRes && saveRes.data && saveRes.data.certificate_file) {
+                  setCertificateFileUrl(saveRes.data.certificate_file);
+                  localStorage.setItem(`certificate_url_${userId}_${activeCourse.id}`, saveRes.data.certificate_file);
+                }
+              } catch (pdfErr) {
+                console.error("Auto certificate generation error:", pdfErr);
+              } finally {
+                setIsGeneratingCert(false);
               }
             }
 
@@ -2130,35 +2145,8 @@ const StudentEnrolledCourses = () => {
         {showCertificate && (() => {
           const courseId = activeCourse.id ? activeCourse.id.toString() : '';
           const dept = (activeCourse.department || 'training').toLowerCase();
-          const customTemplateStr =
-            localStorage.getItem(`certificate_template_${courseId}`) ||
-            localStorage.getItem('certificate_template_default') ||
-            localStorage.getItem(`certificate_template_${dept}`);
+          const customTemplateStr = localStorage.getItem(`certificate_template_${courseId}`) || localStorage.getItem(`certificate_template_${dept}`);
           let template = {
-            bgImageBase64: '',
-            namePositionX: 50,
-            namePositionY: 50,
-            nameFontSize: 40,
-            nameFontFamily: 'Pinyon Script',
-            nameColor: '#1e293b',
-            nameFontWeight: 'bold',
-            nameUnderline: false,
-            showDate: false,
-            datePositionX: 25,
-            datePositionY: 80,
-            dateFontSize: 13,
-            dateColor: '#475569',
-            showCertId: false,
-            certIdPositionX: 75,
-            certIdPositionY: 80,
-            certIdFontSize: 13,
-            certIdColor: '#475569',
-            showCourseTitle: false,
-            courseTitlePositionX: 50,
-            courseTitlePositionY: 62,
-            courseTitleFontSize: 18,
-            courseTitleColor: '#047857',
-            // Classic fallback
             title: 'THE BHARAT SCOUTS & GUIDES',
             subHeader: 'Uttar Pradesh State Headquarters',
             certificationText: 'This is to certify that',
@@ -2167,7 +2155,8 @@ const StudentEnrolledCourses = () => {
             sigLeftSub: 'BSGUP Head Office',
             sigRightTitle: 'State Secretary',
             sigRightSub: 'BSGUP Lucknow',
-            textColor: '#1e293b'
+            textColor: '#1e293b',
+            bgImageBase64: ''
           };
           if (customTemplateStr) {
             try {
@@ -2177,135 +2166,54 @@ const StudentEnrolledCourses = () => {
             }
           }
 
-          const hasBgImage = Boolean(template.bgImageBase64);
-          const issueDate = new Date().toLocaleDateString('en-GB');
-          const certNumber = `BSGUP-${courseId || '101'}-${new Date().getFullYear()}`;
-
           return (
-            <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 overflow-y-auto backdrop-blur-sm">
-              <div className="bg-white p-4 md:p-6 rounded-2xl max-w-3xl w-full shadow-2xl relative border border-slate-200 my-auto">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">🏆</span>
-                    <h3 className="font-extrabold text-slate-800 text-base md:text-lg">Your Official Certificate</h3>
-                  </div>
-                  <button 
-                    onClick={() => setShowCertificate(false)}
-                    className="text-slate-400 hover:text-slate-800 text-lg font-bold bg-slate-100 hover:bg-slate-200 rounded-full w-8 h-8 flex items-center justify-center transition-colors"
-                  >
-                    ✕
-                  </button>
-                </div>
+            <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4 overflow-y-auto">
+              <div className="bg-white p-4 md:p-8 rounded-2xl max-w-2xl w-full shadow-2xl relative border-4 md:border-8 border-amber-400 my-auto">
+                <button 
+                  onClick={() => setShowCertificate(false)}
+                  className="absolute top-3 right-3 text-slate-400 hover:text-slate-800 text-xl font-bold bg-slate-100 hover:bg-slate-200 rounded-full w-8 h-8 flex items-center justify-center transition-colors"
+                >
+                  ✕
+                </button>
                 
-                {/* Certificate Display Area */}
-                {hasBgImage ? (
-                  <div 
-                    style={{
-                      backgroundImage: `url(${template.bgImageBase64})`,
-                      backgroundSize: '100% 100%',
-                      backgroundPosition: 'center',
-                      backgroundRepeat: 'no-repeat'
-                    }}
-                    className="relative w-full aspect-[4/3] md:aspect-[1.414/1] rounded-xl overflow-hidden shadow-lg border border-slate-300 select-none flex items-center justify-center"
-                  >
-                    {/* Dynamic Student Name */}
-                    <div 
-                      style={{
-                        position: 'absolute',
-                        left: `${template.namePositionX || 50}%`,
-                        top: `${template.namePositionY || 50}%`,
-                        transform: 'translate(-50%, -50%)',
-                        fontFamily: template.nameFontFamily || 'Pinyon Script',
-                        fontSize: `${template.nameFontSize ? template.nameFontSize : 36}px`,
-                        color: template.nameColor || '#1e293b',
-                        fontWeight: template.nameFontWeight || 'bold',
-                        textDecoration: template.nameUnderline ? 'underline' : 'none',
-                        whiteSpace: 'nowrap',
-                        zIndex: 10
-                      }}
-                      className="drop-shadow-sm"
-                    >
-                      {studentName}
+                {/* Golden Certificate Layout / Dynamic custom template background */}
+                <div 
+                  style={{
+                    backgroundImage: template.bgImageBase64 ? `url(${template.bgImageBase64})` : 'none',
+                    backgroundSize: '100% 100%',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
+                    color: template.textColor || '#1e293b',
+                    borderColor: template.bgImageBase64 ? 'transparent' : '#fbbf24'
+                  }}
+                  className={`text-center py-6 border-2 md:border-4 rounded-lg p-4 md:p-8 relative min-h-[360px] md:min-h-[460px] flex flex-col justify-center items-center ${
+                    template.bgImageBase64 ? 'border-none shadow-inner' : 'border-slate-900 border-dashed bg-white'
+                  }`}
+                >
+                  {template.bgImageBase64 ? (
+                    /* Custom Uploaded Certificate Template: Cleanly overlay student name and details on the uploaded template */
+                    <div className="w-full flex flex-col justify-center items-center my-auto py-10">
+                      <h1 
+                        className="text-2xl sm:text-4xl md:text-5xl font-serif font-black underline decoration-double decoration-amber-400 px-4" 
+                        style={{ color: template.textColor || '#1e293b' }} 
+                        title={studentName}
+                      >
+                        {studentName}
+                      </h1>
+                      {studentDistrict && (
+                        <p className="text-xs sm:text-sm md:text-base font-bold text-slate-700 mt-3">
+                          District: <span className="font-extrabold">{studentDistrict}</span>
+                        </p>
+                      )}
+                      {certificateNumber && (
+                        <div className="text-[10px] md:text-xs font-mono font-bold text-amber-900 bg-amber-100/90 border border-amber-300 px-3 py-1 rounded mt-4">
+                          Certificate No: {certificateNumber}
+                        </div>
+                      )}
                     </div>
-
-                    {/* Optional District */}
-                    {(template.showDistrict !== false && (studentDistrict || template.showDistrict)) && (
-                      <div 
-                        style={{
-                          position: 'absolute',
-                          left: `${template.districtPositionX || 50}%`,
-                          top: `${template.districtPositionY || 56}%`,
-                          transform: 'translate(-50%, -50%)',
-                          fontSize: `${template.districtFontSize || 14}px`,
-                          color: template.districtColor || '#334155',
-                          fontWeight: 600,
-                          zIndex: 10
-                        }}
-                      >
-                        {studentDistrict ? `District: ${studentDistrict}` : 'District: GORAKHPUR'}
-                      </div>
-                    )}
-
-                    {template.showDate && (
-                      <div 
-                        style={{
-                          position: 'absolute',
-                          left: `${template.datePositionX || 25}%`,
-                          top: `${template.datePositionY || 80}%`,
-                          transform: 'translate(-50%, -50%)',
-                          fontSize: `${template.dateFontSize || 13}px`,
-                          color: template.dateColor || '#475569',
-                          fontWeight: 600,
-                          zIndex: 10
-                        }}
-                      >
-                        Date: {issueDate}
-                      </div>
-                    )}
-
-                    {(template.showCertId !== false && (certificateNumber || template.showCertId)) && (
-                      <div 
-                        style={{
-                          position: 'absolute',
-                          left: `${template.certIdPositionX || 75}%`,
-                          top: `${template.certIdPositionY || 80}%`,
-                          transform: 'translate(-50%, -50%)',
-                          fontSize: `${template.certIdFontSize || 13}px`,
-                          color: template.certIdColor || '#475569',
-                          fontWeight: 600,
-                          zIndex: 10
-                        }}
-                      >
-                        Certificate No: {certificateNumber || certNumber}
-                      </div>
-                    )}
-
-                    {template.showCourseTitle && (
-                      <div 
-                        style={{
-                          position: 'absolute',
-                          left: `${template.courseTitlePositionX || 50}%`,
-                          top: `${template.courseTitlePositionY || 62}%`,
-                          transform: 'translate(-50%, -50%)',
-                          fontSize: `${template.courseTitleFontSize || 18}px`,
-                          color: template.courseTitleColor || '#047857',
-                          fontWeight: 700,
-                          zIndex: 10
-                        }}
-                      >
-                        {activeCourse.title}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div 
-                    style={{
-                      color: template.textColor,
-                      borderColor: '#fbbf24'
-                    }}
-                    className="text-center py-6 border-4 border-amber-400 rounded-xl p-6 bg-amber-50/10"
-                  >
-                    <div className="border-2 border-dashed border-slate-800 p-6 rounded-lg">
+                  ) : (
+                    /* Classic Fallback Layout when no template image is uploaded */
+                    <div className="w-full">
                       <div className="text-3xl md:text-5xl mb-2">⚜️</div>
                       <h2 className="text-base md:text-2xl font-black tracking-wider" style={{ color: template.textColor }}>
                         {template.title}
@@ -2317,20 +2225,37 @@ const StudentEnrolledCourses = () => {
                       <p className="text-[10px] md:text-xs italic font-semibold text-slate-500">
                         {template.certificationText}
                       </p>
-                      <h1 className="text-xl md:text-4xl font-serif font-black my-2 md:my-4 underline decoration-double decoration-amber-400 truncate px-2" style={{ color: template.textColor }} title={studentName}>
+                      <h1 className="text-xl md:text-4xl font-serif font-black my-2 md:my-3 underline decoration-double decoration-amber-400 truncate px-2" style={{ color: template.textColor }} title={studentName}>
                         {studentName}
                       </h1>
+
+                      {studentDistrict && (
+                        <p className="text-[11px] md:text-sm font-bold text-slate-600 mb-2">
+                          District: <span className="text-slate-800">{studentDistrict}</span>
+                        </p>
+                      )}
                       
-                      <p className="text-[10px] md:text-sm max-w-md mx-auto leading-relaxed mb-4 md:mb-6" style={{ color: template.textColor }}>
+                      <p className="text-[10px] md:text-sm max-w-md mx-auto leading-relaxed mb-3 md:mb-4" style={{ color: template.textColor }}>
                         {template.descriptionText}
                       </p>
                       
-                      <h3 className="text-sm md:text-xl font-bold text-emerald-700 bg-emerald-50 py-1.5 md:py-2 px-4 md:px-6 rounded-full w-fit mx-auto mb-6 md:mb-8 border border-emerald-100">
+                      <h3 className="text-sm md:text-xl font-bold text-emerald-700 bg-emerald-50 py-1.5 md:py-2 px-4 md:px-6 rounded-full w-fit mx-auto mb-4 md:mb-6 border border-emerald-100">
                         {activeCourse.title}
                       </h3>
+
+                      {certificateNumber && (
+                        <div className="text-[9px] md:text-xs font-mono font-bold text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1 rounded-md w-fit mx-auto mb-4">
+                          Certificate No: {certificateNumber}
+                        </div>
+                      )}
                       
                       <div className="grid grid-cols-2 gap-4 border-t border-slate-200 pt-4 md:pt-6 max-w-md mx-auto">
                         <div className="text-center flex flex-col justify-end min-h-[60px]">
+                          {template.sigLeftImageBase64 && (
+                            <div className="h-8 md:h-12 flex items-end justify-center mb-1">
+                              <img src={template.sigLeftImageBase64} alt="Left Signature" className="max-h-full object-contain" />
+                            </div>
+                          )}
                           <div className="w-16 md:w-24 h-0.5 bg-slate-300 mx-auto"></div>
                           <div className="font-serif italic font-semibold text-[10px] md:text-xs mt-1 mb-1" style={{ color: template.textColor }}>
                             {template.sigLeftTitle}
@@ -2340,6 +2265,11 @@ const StudentEnrolledCourses = () => {
                           </div>
                         </div>
                         <div className="text-center flex flex-col justify-end min-h-[60px]">
+                          {template.sigRightImageBase64 && (
+                            <div className="h-8 md:h-12 flex items-end justify-center mb-1">
+                              <img src={template.sigRightImageBase64} alt="Right Signature" className="max-h-full object-contain" />
+                            </div>
+                          )}
                           <div className="w-16 md:w-24 h-0.5 bg-slate-300 mx-auto"></div>
                           <div className="font-serif italic font-semibold text-[10px] md:text-xs mt-1 mb-1" style={{ color: template.textColor }}>
                             {template.sigRightTitle}
@@ -2350,28 +2280,28 @@ const StudentEnrolledCourses = () => {
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center items-center">
                   <button 
-                    onClick={handleDownloadPdf}
-                    disabled={pdfGenerating}
-                    className="w-full sm:w-auto bg-[#10b981] hover:bg-[#059669] text-white font-extrabold px-6 py-2.5 rounded-xl transition-all shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                    onClick={handleDownloadCertificate}
+                    disabled={isGeneratingCert}
+                    className="w-full sm:w-auto bg-[#10b981] hover:bg-[#059669] text-white font-extrabold px-6 py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 text-sm disabled:opacity-50"
                   >
-                    <span>⬇️</span> {pdfGenerating ? 'Generating PDF...' : 'Download PDF Certificate'}
+                    <span>⬇️</span> {isGeneratingCert ? 'Generating...' : 'Download PDF Certificate'}
                   </button>
                   <button 
                     onClick={handlePrintCertificate}
-                    className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white font-bold px-5 py-2.5 rounded-xl transition-all shadow-md shadow-purple-500/20 flex items-center justify-center gap-2 text-sm"
+                    className="w-full sm:w-auto bg-slate-800 hover:bg-slate-900 text-white font-bold px-6 py-2.5 rounded-xl transition-all text-sm flex items-center justify-center gap-2"
                   >
-                    <span>🖨️</span> Print View
+                    <span>🖨️</span> Print
                   </button>
                   <button 
                     onClick={() => setShowCertificate(false)}
                     className="w-full sm:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-6 py-2.5 rounded-xl transition-all text-sm"
                   >
-                    Close
+                    Close Preview
                   </button>
                 </div>
               </div>

@@ -221,7 +221,7 @@ const Footer = () => {
           {/* ───────────── CTA ───────────── */}
           <div className="border-b border-white/10 py-10 sm:py-12">
             <div className="flex flex-col gap-6 rounded-2xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-sm sm:p-8 lg:flex-row lg:items-center lg:justify-between">
-              <div className="max-w-2xl">
+              <div className="max-w-2xl text-left">
                 <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-purple-400/20 bg-purple-500/10 px-3 py-1 text-xs font-semibold text-purple-300">
                   <BookIcon size={14} />
                   Learn • Grow • Lead
@@ -254,7 +254,7 @@ const Footer = () => {
           </div>
 
           {/* ───────────── Main Footer ───────────── */}
-          <div className="grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-12 lg:gap-8 lg:py-14">
+          <div className="grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-12 lg:gap-8 lg:py-14 text-left">
             {/* Brand */}
             <div className="lg:col-span-4">
               <a
@@ -474,7 +474,7 @@ const Footer = () => {
             aria-labelledby="legal-modal-title"
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6 text-left">
               <div>
                 <div className="mb-1 flex items-center gap-2">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-100 text-purple-600">
@@ -506,7 +506,7 @@ const Footer = () => {
             </div>
 
             {/* Modal Content */}
-            <div className="overflow-y-auto px-5 py-6 text-sm leading-7 text-slate-700 sm:px-7">
+            <div className="overflow-y-auto px-5 py-6 text-sm leading-7 text-slate-700 sm:px-7 text-left">
               {activeModal === "terms" ? (
                 <TermsContent />
               ) : (
@@ -547,7 +547,7 @@ const TermsContent = () => (
     </LegalSection>
 
     <LegalSection title="2. User Registration">
-      <ul>
+      <ul className="list-disc pl-5 space-y-1">
         <li>Users must provide accurate and complete information.</li>
         <li>
           Users are responsible for maintaining the confidentiality of their
@@ -561,7 +561,7 @@ const TermsContent = () => (
     </LegalSection>
 
     <LegalSection title="3. Courses & Camp Registration">
-      <ul>
+      <ul className="list-disc pl-5 space-y-1">
         <li>Admission is subject to availability and eligibility criteria.</li>
         <li>
           Registration is confirmed only after successful payment where
@@ -575,7 +575,7 @@ const TermsContent = () => (
     </LegalSection>
 
     <LegalSection title="4. Payments">
-      <ul>
+      <ul className="list-disc pl-5 space-y-1">
         <li>
           Payments are processed securely through authorized payment gateways.
         </li>
@@ -588,7 +588,7 @@ const TermsContent = () => (
     </LegalSection>
 
     <LegalSection title="5. Refund & Cancellation">
-      <ul>
+      <ul className="list-disc pl-5 space-y-1">
         <li>
           Fees once paid are generally non-refundable unless specifically
           approved by U.P. Bharat Scouts & Guides.
@@ -605,7 +605,7 @@ const TermsContent = () => (
     </LegalSection>
 
     <LegalSection title="6. Certificates">
-      <ul>
+      <ul className="list-disc pl-5 space-y-1">
         <li>
           Certificates are issued only after successful completion of the
           prescribed course or training.
@@ -619,7 +619,7 @@ const TermsContent = () => (
 
     <LegalSection title="7. User Responsibilities">
       <p className="mb-2 font-medium text-slate-900">Users agree not to:</p>
-      <ul>
+      <ul className="list-disc pl-5 space-y-1">
         <li>Share login credentials with others.</li>
         <li>Upload false, misleading, or illegal information.</li>
         <li>Attempt to hack, modify, or disrupt the website.</li>
@@ -683,7 +683,7 @@ const PrivacyContent = () => (
     </div>
 
     <LegalSection title="1. Information We Collect">
-      <ul>
+      <ul className="list-disc pl-5 space-y-1">
         <li>Name</li>
         <li>Mobile Number</li>
         <li>Email Address</li>
@@ -701,7 +701,7 @@ const PrivacyContent = () => (
         We use your information to:
       </p>
 
-      <ul>
+      <ul className="list-disc pl-5 space-y-1">
         <li>Register users for courses and camps.</li>
         <li>Process online payments.</li>
         <li>Generate certificates.</li>

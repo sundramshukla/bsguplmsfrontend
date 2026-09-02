@@ -5,11 +5,14 @@ export const getAdminUserId = () =>
 
 const DEPARTMENT_LABELS = {
   youth_programme: 'Youth Programme',
+  youth: 'Youth Programme',
   adult_programme: 'Adult Programme',
+  adult: 'Adult Programme',
   tech_skill: 'Tech Skill',
-  training: 'Youth Programme',
-  organisation: 'Adult Programme',
-  organization: 'Adult Programme',
+  tech: 'Tech Skill',
+  training: 'Training',
+  organisation: 'Organization',
+  organization: 'Organization',
   it: 'Tech Skill'
 };
 
@@ -95,59 +98,51 @@ export const fetchAdminDashboard = async (adminUserId = getAdminUserId()) => {
 
   // Parse department wise enrollment (handles both array and object responses)
   const deptWise = metrics.department_wise_enrollment || metrics.department_enrollments || metrics.enrollments_by_department || null;
-  const parsedDept = { youth_programme: 0, adult_programme: 0, tech_skill: 0 };
+  const parsedDept = {
+    youth_programme: 0,
+    adult_programme: 0,
+    tech_skill: 0,
+    training: 0,
+    organisation: 0,
+    organization: 0,
+    it: 0
+  };
   if (Array.isArray(deptWise)) {
     deptWise.forEach(item => {
-      const rawDeptName = item.course__department || item.department || '';
+      const deptName = item.course__department || item.department || '';
       const count = item.total_enrollments ?? item.count ?? 0;
-      if (rawDeptName) {
-        const key = rawDeptName.toLowerCase();
-        if (key === 'youth_programme' || key === 'training') parsedDept.youth_programme += count;
-        else if (key === 'adult_programme' || key === 'organisation' || key === 'organization') parsedDept.adult_programme += count;
-        else if (key === 'tech_skill' || key === 'it') parsedDept.tech_skill += count;
-        else parsedDept.youth_programme += count;
+      if (deptName) {
+        parsedDept[deptName.toLowerCase()] = count;
       }
     });
   } else if (typeof deptWise === 'object' && deptWise !== null) {
     Object.keys(deptWise).forEach(key => {
-      const lower = key.toLowerCase();
-      const count = Number(deptWise[key]) || 0;
-      if (lower === 'youth_programme' || lower === 'training') parsedDept.youth_programme += count;
-      else if (lower === 'adult_programme' || lower === 'organisation' || lower === 'organization') parsedDept.adult_programme += count;
-      else if (lower === 'tech_skill' || lower === 'it') parsedDept.tech_skill += count;
-      else parsedDept.youth_programme += count;
+      parsedDept[key.toLowerCase()] = deptWise[key];
     });
   }
 
   return {
-    registeredStudents: metrics.registered_students ?? metrics.total_students ?? 0,
-    enrolledStudents: metrics.enrolled_students ?? metrics.total_enrollments ?? 0,
+    totalStudents: metrics.total_users ?? metrics.total_students ?? 0,
     totalCourses: metrics.total_courses ?? 0,
-    totalLessons: metrics.total_lessons ?? 0,
-    completionRate: metrics.completion_rate ?? 0,
-    totalRevenue: metrics.total_revenue ?? 0,
-    recentEnrollments: parseEnrollmentRecords(metrics.recent_enrollments || metrics.recent || []),
+    totalEnrollments: metrics.total_enrollments ?? 0,
+    completionRate: metrics.completion_rate ?? metrics.avg_completion_rate ?? 0,
+    recentEnrollments: parseEnrollmentRecords(metrics.recent_enrollments || metrics.recent_students || []),
     departmentEnrollments: parsedDept,
-    raw: metrics
+    revenue: metrics.total_revenue ?? metrics.revenue ?? 0
   };
 };
 
 export const fetchAdminEnrollmentRecords = async (adminUserId = getAdminUserId()) => {
-  const urls = [
-    `${BASE_URL}/user/enrollment/`,
-    `${BASE_URL}/user/enrollment/?user_id=${encodeURIComponent(adminUserId)}`
-  ];
-
-  for (const url of urls) {
-    try {
-      const res = await fetch(url, { method: 'GET' });
-      if (!res.ok) continue;
-      const data = await res.json();
-      const records = parseEnrollmentRecords(data);
-      if (records.length) return records;
-    } catch {
-      // try next url
+  try {
+    const res = await fetch(
+      `${BASE_URL}/user/enrollment/?user_id=${encodeURIComponent(adminUserId)}`
+    );
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.success !== false) {
+      return parseEnrollmentRecords(data);
     }
+  } catch {
+    // Fall back to empty list on error
   }
 
   return [];
@@ -167,7 +162,9 @@ export const buildDepartmentStats = (enrollmentRecords, courses = []) => {
   const counts = {
     'Youth Programme': 0,
     'Adult Programme': 0,
-    'Tech Skill': 0
+    'Tech Skill': 0,
+    'Training': 0,
+    'Organization': 0
   };
 
   enrollmentRecords.forEach((record) => {
@@ -183,7 +180,9 @@ export const buildDepartmentStats = (enrollmentRecords, courses = []) => {
   return [
     { name: 'Youth Programme', value: counts['Youth Programme'], color: 'bg-purple-500' },
     { name: 'Adult Programme', value: counts['Adult Programme'], color: 'bg-blue-500' },
-    { name: 'Tech Skill', value: counts['Tech Skill'], color: 'bg-emerald-500' }
+    { name: 'Tech Skill', value: counts['Tech Skill'], color: 'bg-emerald-500' },
+    { name: 'Training', value: counts['Training'], color: 'bg-amber-500' },
+    { name: 'Organization', value: counts['Organization'], color: 'bg-indigo-500' }
   ];
 };
 
@@ -202,55 +201,69 @@ export const formatCompletionRate = (value) => {
   return `${Math.round(numeric)}%`;
 };
 
-export const formatRevenue = (value) => {
-  const numeric = Number(value) || 0;
-  return `₹ ${numeric.toFixed(2)}`;
+export const formatRevenue = (amount) => {
+  const num = Number(amount) || 0;
+  return `₹ ${num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 export const fetchStudentActiveStatus = async (studentId) => {
   try {
+    const res = await fetch(`${BASE_URL}/bsgupadmin/student-status/?student_id=${studentId}`);
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.success !== false) {
+      return data.is_active ?? data.active ?? true;
+    }
+  } catch {
+    // Ignore and fallback
+  }
+  return true;
+};
+
+export const toggleStudentActiveStatus = async (studentId, currentStatus) => {
+  try {
     const adminUserId = getAdminUserId();
     if (!adminUserId || !studentId) return true;
 
-    // Toggle 1: Change to new status
-    const res1 = await fetch(`${BASE_URL}/bsgupadmin/student-status-change/`, {
+    const newStatus = !currentStatus;
+    const res = await fetch(`${BASE_URL}/bsgupadmin/student-status/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: Number(adminUserId), student_id: Number(studentId), is_active: newStatus })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.success !== false) {
+      return newStatus;
+    }
+
+    // Try alternate endpoint if student-status fails
+    const fallbackRes = await fetch(`${BASE_URL}/bsgupadmin/toggle-student-active/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: Number(adminUserId), student_id: Number(studentId) })
     });
-    if (!res1.ok) return true;
-    const data1 = await res1.json();
-    const newState = data1.is_active_student;
-
-    // Toggle 2: Revert to original status
-    await fetch(`${BASE_URL}/bsgupadmin/student-status-change/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: Number(adminUserId), student_id: Number(studentId) })
-    });
-
-    return !newState;
-  } catch (e) {
-    console.error('Error fetching student active status:', e);
-    return true;
+    const fallbackData = await fallbackRes.json().catch(() => ({}));
+    if (fallbackRes.ok && fallbackData.success !== false) {
+      return newStatus;
+    }
+  } catch {
+    // Return original on error
   }
+  return currentStatus;
 };
 
-export const toggleStudentActiveStatus = async (studentId) => {
+export const deleteStudentProfile = async (studentId) => {
   try {
     const adminUserId = getAdminUserId();
     if (!adminUserId || !studentId) return { success: false };
 
-    const res = await fetch(`${BASE_URL}/bsgupadmin/student-status-change/`, {
-      method: 'POST',
+    const res = await fetch(`${BASE_URL}/bsgupadmin/delete-student/`, {
+      method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: Number(adminUserId), student_id: Number(studentId) })
     });
-    if (!res.ok) return { success: false };
-    const data = await res.json();
-    return { success: true, is_active: data.is_active_student };
-  } catch (e) {
-    console.error('Error toggling student active status:', e);
-    return { success: false };
+    const data = await res.json().catch(() => ({}));
+    return { success: res.ok && data.success !== false, message: data.message || data.error };
+  } catch (err) {
+    return { success: false, message: err.message };
   }
 };

@@ -12,11 +12,14 @@ import Loader from './Loader';
 
 const DEPARTMENTS_MAP = {
   youth_programme: 'Youth Programme',
+  youth: 'Youth Programme',
   adult_programme: 'Adult Programme',
+  adult: 'Adult Programme',
   tech_skill: 'Tech Skill',
-  training: 'Youth Programme',
-  organisation: 'Adult Programme',
-  organization: 'Adult Programme',
+  tech: 'Tech Skill',
+  organisation: 'Organization',
+  organization: 'Organization',
+  training: 'Training',
   it: 'Tech Skill'
 };
 
@@ -38,21 +41,16 @@ const CoursesPage = () => {
         const res = await fetch(`${BASE_URL}/bsgupadmin/createcourse/`);
         const data = await res.json();
         if (data.success && data.data) {
-          const formattedCourses = data.data.map(c => {
-            const rawDept = (c.department || '').toLowerCase().trim();
-            const deptLabel = DEPARTMENTS_MAP[rawDept] || 'Youth Programme';
-            return {
-              id: c.id,
-              title: c.title,
-              description: c.description,
-              image: c.course_profile_pic ? `${BASE_URL}${c.course_profile_pic}` : "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=400&h=250&fit=crop",
-              duration: c.duration || "4 Weeks",
-              level: "Beginner",
-              department: deptLabel,
-              rawDepartment: rawDept,
-              price: c.price
-            };
-          });
+          const formattedCourses = data.data.map(c => ({
+            id: c.id,
+            title: c.title,
+            description: c.description,
+            image: c.course_profile_pic ? `${BASE_URL}${c.course_profile_pic}` : "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=400&h=250&fit=crop",
+            duration: c.duration || "4 Weeks",
+            level: "Beginner", // hardcoded as fallback but can be dynamic if backend adds it
+            department: DEPARTMENTS_MAP[c.department] || "Organization",
+            price: c.price
+          }));
           // sort by ID descending so newest is first
           setCourses(formattedCourses.sort((a,b) => b.id - a.id));
         }
@@ -174,7 +172,7 @@ const CoursesPage = () => {
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
           <h1 className="text-3xl md:text-5xl font-bold text-slate-900 mb-4">
-            Available Courses for Beginners
+            All Courses
           </h1>
           <p className="text-slate-600 max-w-2xl mx-auto">
             Browse our comprehensive collection of training programs designed to develop leadership, character, and practical skills.
@@ -188,13 +186,13 @@ const CoursesPage = () => {
             <button
               key={dept}
               onClick={() => setActiveFilter(dept)}
-              className={`px-5 py-2 rounded-full font-medium transition-colors ${
+              className={`px-5 py-2 rounded-full font-semibold transition-all duration-200 ${
                 activeFilter === dept
-                  ? 'bg-[#7c3aed] text-white shadow-md'
-                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                  ? 'bg-[#7c3aed] text-white shadow-md shadow-purple-500/20 scale-105'
+                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-slate-300'
               }`}
             >
-              {dept === 'All' ? 'All Departments' : dept}
+              {dept === 'All' ? 'All Courses' : dept}
             </button>
           ))}
         </div>
@@ -209,12 +207,6 @@ const CoursesPage = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
             {currentCards.map((course) => {
-              console.log('CoursesPage rendering course:', {
-                course_id: course.id,
-                course_course_id: course.course?.id,
-                course_title: course.title,
-                course_full: JSON.stringify(course)
-              });
               return (
               <div key={course.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-shadow border border-slate-100 flex flex-col">
                 <img 
@@ -223,22 +215,17 @@ const CoursesPage = () => {
                   className="w-full h-48 object-cover"
                 />
                 <div className="p-6 flex-1 flex flex-col">
-                  <div className="flex items-center justify-between mb-3 text-sm text-slate-500 font-medium whitespace-nowrap overflow-hidden">
-                    <div className="flex gap-2 items-center">
-                      <span className="bg-[#7c3aed]/10 text-[#7c3aed] px-3 py-1 rounded-full text-xs truncate max-w-[100px]" title={course.level}>
-                        {course.level}
-                      </span>
-                      <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs truncate max-w-[120px]" title={`${course.department} Dept`}>
-                        {course.department} Dept
-                      </span>
-                    </div>
-                    <span className="flex items-center gap-1 shrink-0">
+                  <div className="flex items-center justify-between mb-3 text-sm text-slate-500 font-medium">
+                    <span className="bg-purple-100 text-[#7c3aed] font-bold px-3 py-1 rounded-full text-xs" title={course.department}>
+                      {course.department}
+                    </span>
+                    <span className="flex items-center gap-1 shrink-0 text-slate-500 text-xs font-semibold">
                       <span className="material-symbols-outlined text-base">schedule</span>
                       {course.duration}
                     </span>
                   </div>
-                  <h3 className="text-xl font-bold text-slate-900 mb-2">{course.title}</h3>
-                  <p className="text-slate-600 text-sm mb-6 flex-1">
+                  <h3 className="text-xl font-bold text-slate-900 mb-2 leading-snug">{course.title}</h3>
+                  <p className="text-slate-600 text-sm mb-6 flex-1 line-clamp-3">
                     {course.description}
                   </p>
                   <div className="flex items-center justify-between mb-4">

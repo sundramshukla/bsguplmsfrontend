@@ -26,15 +26,6 @@ const StudentDepartmentCourses = ({ department, title }) => {
     setEnrolledCourseIds(ids);
   };
 
-  const normalizeDept = (dept) => {
-    if (!dept) return '';
-    const d = dept.toLowerCase().trim();
-    if (d === 'youth_programme' || d === 'training') return 'youth_programme';
-    if (d === 'adult_programme' || d === 'organisation' || d === 'organization') return 'adult_programme';
-    if (d === 'tech_skill' || d === 'it') return 'tech_skill';
-    return d;
-  };
-
   useEffect(() => {
     const fetchCourses = async () => {
       setLoading(true);
@@ -42,10 +33,19 @@ const StudentDepartmentCourses = ({ department, title }) => {
         const res = await fetch(`${BASE_URL}/bsgupadmin/createcourse/`);
         const data = await res.json();
         if (data.success && data.data) {
-          const targetDept = normalizeDept(department);
-          const filteredCourses = data.data.filter(course => 
-            normalizeDept(course.department) === targetDept
-          );
+          const filteredCourses = data.data.filter(course => {
+            if (!course.department) return false;
+            const cDept = course.department.toLowerCase().trim();
+            const targetDept = department.toLowerCase().trim();
+            if (cDept === targetDept) return true;
+            if (targetDept === 'youth_programme' && (cDept === 'youth' || cDept === 'youth_programme')) return true;
+            if (targetDept === 'adult_programme' && (cDept === 'adult' || cDept === 'adult_programme')) return true;
+            if (targetDept === 'tech_skill' && (cDept === 'tech_skill' || cDept === 'tech' || cDept === 'it')) return true;
+            if (targetDept === 'it' && (cDept === 'tech_skill' || cDept === 'tech' || cDept === 'it')) return true;
+            if (targetDept === 'organisation' && (cDept === 'organisation' || cDept === 'organization')) return true;
+            if (targetDept === 'training' && cDept === 'training') return true;
+            return false;
+          });
           setCourses(filteredCourses);
         }
       } catch (err) {
