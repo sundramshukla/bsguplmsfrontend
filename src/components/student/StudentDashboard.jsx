@@ -83,22 +83,22 @@ const StudentDashboard = ({ onLogout }) => {
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-4">Departments</p>
           </div>
           <button 
-            onClick={() => handleTabClick('dept_org')}
-            className={`w-full text-left px-4 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center gap-3 ${activeTab === 'dept_org' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 translate-x-1' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+            onClick={() => handleTabClick('dept_youth')}
+            className={`w-full text-left px-4 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center gap-3 ${activeTab === 'dept_youth' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 translate-x-1' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
           >
-            <span>🏢</span> Organization Dept
+            <span>⚜️</span> Youth Programme
           </button>
           <button 
-            onClick={() => handleTabClick('dept_training')}
-            className={`w-full text-left px-4 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center gap-3 ${activeTab === 'dept_training' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 translate-x-1' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+            onClick={() => handleTabClick('dept_adult')}
+            className={`w-full text-left px-4 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center gap-3 ${activeTab === 'dept_adult' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 translate-x-1' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
           >
-            <span>🏋️‍♂️</span> Training Dept
+            <span>👔</span> Adult Programme
           </button>
           <button 
-            onClick={() => handleTabClick('dept_it')}
-            className={`w-full text-left px-4 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center gap-3 ${activeTab === 'dept_it' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 translate-x-1' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+            onClick={() => handleTabClick('dept_tech')}
+            className={`w-full text-left px-4 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center gap-3 ${activeTab === 'dept_tech' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 translate-x-1' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
           >
-            <span>💻</span> IT Dept
+            <span>💻</span> Tech Skill
           </button>
           
           <div className="pt-4 pb-2">
@@ -135,9 +135,9 @@ const StudentDashboard = ({ onLogout }) => {
         <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
             {activeTab === 'analytics' && <StudentAnalytics onNavigate={handleTabClick} />}
             {activeTab === 'enrolled' && <StudentEnrolledCourses />}
-            {activeTab === 'dept_org' && <StudentDepartmentCourses department="organisation" title="Organization Department" />}
-            {activeTab === 'dept_training' && <StudentDepartmentCourses department="training" title="Training Department" />}
-            {activeTab === 'dept_it' && <StudentDepartmentCourses department="it" title="IT Department" />}
+            {(activeTab === 'dept_youth' || activeTab === 'dept_training') && <StudentDepartmentCourses department="youth_programme" title="Youth Programme" />}
+            {(activeTab === 'dept_adult' || activeTab === 'dept_org') && <StudentDepartmentCourses department="adult_programme" title="Adult Programme" />}
+            {(activeTab === 'dept_tech' || activeTab === 'dept_it') && <StudentDepartmentCourses department="tech_skill" title="Tech Skill" />}
             {activeTab === 'profile' && <StudentProfile />}
             {activeTab === 'payment' && <StudentPaymentHistory />}
             {activeTab === 'contact' && <StudentContact />}

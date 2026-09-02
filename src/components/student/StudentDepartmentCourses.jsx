@@ -26,6 +26,15 @@ const StudentDepartmentCourses = ({ department, title }) => {
     setEnrolledCourseIds(ids);
   };
 
+  const normalizeDept = (dept) => {
+    if (!dept) return '';
+    const d = dept.toLowerCase().trim();
+    if (d === 'youth_programme' || d === 'training') return 'youth_programme';
+    if (d === 'adult_programme' || d === 'organisation' || d === 'organization') return 'adult_programme';
+    if (d === 'tech_skill' || d === 'it') return 'tech_skill';
+    return d;
+  };
+
   useEffect(() => {
     const fetchCourses = async () => {
       setLoading(true);
@@ -33,8 +42,9 @@ const StudentDepartmentCourses = ({ department, title }) => {
         const res = await fetch(`${BASE_URL}/bsgupadmin/createcourse/`);
         const data = await res.json();
         if (data.success && data.data) {
+          const targetDept = normalizeDept(department);
           const filteredCourses = data.data.filter(course => 
-             course.department && course.department.toLowerCase() === department.toLowerCase()
+            normalizeDept(course.department) === targetDept
           );
           setCourses(filteredCourses);
         }

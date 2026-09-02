@@ -11,9 +11,13 @@ import {
 import Loader from './Loader';
 
 const DEPARTMENTS_MAP = {
-  organisation: 'Organization',
-  training: 'Training',
-  it: 'IT'
+  youth_programme: 'Youth Programme',
+  adult_programme: 'Adult Programme',
+  tech_skill: 'Tech Skill',
+  training: 'Youth Programme',
+  organisation: 'Adult Programme',
+  organization: 'Adult Programme',
+  it: 'Tech Skill'
 };
 
 const CoursesPage = () => {
@@ -34,16 +38,21 @@ const CoursesPage = () => {
         const res = await fetch(`${BASE_URL}/bsgupadmin/createcourse/`);
         const data = await res.json();
         if (data.success && data.data) {
-          const formattedCourses = data.data.map(c => ({
-            id: c.id,
-            title: c.title,
-            description: c.description,
-            image: c.course_profile_pic ? `${BASE_URL}${c.course_profile_pic}` : "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=400&h=250&fit=crop",
-            duration: c.duration || "4 Weeks",
-            level: "Beginner", // hardcoded as fallback but can be dynamic if backend adds it
-            department: DEPARTMENTS_MAP[c.department] || "Organization",
-            price: c.price
-          }));
+          const formattedCourses = data.data.map(c => {
+            const rawDept = (c.department || '').toLowerCase().trim();
+            const deptLabel = DEPARTMENTS_MAP[rawDept] || 'Youth Programme';
+            return {
+              id: c.id,
+              title: c.title,
+              description: c.description,
+              image: c.course_profile_pic ? `${BASE_URL}${c.course_profile_pic}` : "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=400&h=250&fit=crop",
+              duration: c.duration || "4 Weeks",
+              level: "Beginner",
+              department: deptLabel,
+              rawDepartment: rawDept,
+              price: c.price
+            };
+          });
           // sort by ID descending so newest is first
           setCourses(formattedCourses.sort((a,b) => b.id - a.id));
         }
@@ -175,7 +184,7 @@ const CoursesPage = () => {
 
         {/* Filters */}
         <div className="flex flex-wrap justify-center gap-3 mb-10">
-          {['All', 'Organization', 'Training', 'IT'].map(dept => (
+          {['All', 'Youth Programme', 'Adult Programme', 'Tech Skill'].map(dept => (
             <button
               key={dept}
               onClick={() => setActiveFilter(dept)}
@@ -185,7 +194,7 @@ const CoursesPage = () => {
                   : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
               }`}
             >
-              {dept === 'All' ? 'All Departments' : `${dept} Department`}
+              {dept === 'All' ? 'All Departments' : dept}
             </button>
           ))}
         </div>

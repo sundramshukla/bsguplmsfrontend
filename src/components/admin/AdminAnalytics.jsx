@@ -21,9 +21,9 @@ const AdminAnalytics = ({ onNavigate }) => {
   const [totalRevenue, setTotalRevenue] = useState('₹ 0.00');
   const [recentEnrollments, setRecentEnrollments] = useState([]);
   const [departmentStats, setDepartmentStats] = useState([
-    { name: 'Training', value: 0, color: 'bg-blue-500' },
-    { name: 'Organization', value: 0, color: 'bg-purple-500' },
-    { name: 'IT', value: 0, color: 'bg-emerald-500' }
+    { name: 'Youth Programme', value: 0, color: 'bg-purple-500' },
+    { name: 'Adult Programme', value: 0, color: 'bg-blue-500' },
+    { name: 'Tech Skill', value: 0, color: 'bg-emerald-500' }
   ]);
 
   useEffect(() => {
@@ -60,22 +60,18 @@ const AdminAnalytics = ({ onNavigate }) => {
         if (dashboard.departmentEnrollments) {
           setDepartmentStats([
             {
-              name: 'Training',
-              value: dashboard.departmentEnrollments.training ?? dashboard.departmentEnrollments.Training ?? 0,
-              color: 'bg-blue-500'
-            },
-            {
-              name: 'Organization',
-              value:
-                dashboard.departmentEnrollments.organisation ??
-                dashboard.departmentEnrollments.organization ??
-                dashboard.departmentEnrollments.Organization ??
-                0,
+              name: 'Youth Programme',
+              value: dashboard.departmentEnrollments.youth_programme ?? 0,
               color: 'bg-purple-500'
             },
             {
-              name: 'IT',
-              value: dashboard.departmentEnrollments.it ?? dashboard.departmentEnrollments.IT ?? 0,
+              name: 'Adult Programme',
+              value: dashboard.departmentEnrollments.adult_programme ?? 0,
+              color: 'bg-blue-500'
+            },
+            {
+              name: 'Tech Skill',
+              value: dashboard.departmentEnrollments.tech_skill ?? 0,
               color: 'bg-emerald-500'
             }
           ]);

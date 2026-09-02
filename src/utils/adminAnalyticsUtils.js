@@ -1,18 +1,21 @@
 import { BASE_URL } from '../config';
 
 export const getAdminUserId = () =>
-  localStorage.getItem('adminUserId') || localStorage.getItem('userId');
+  localStorage.getItem('adminUserId') || localStorage.getItem('userId') || '1';
 
 const DEPARTMENT_LABELS = {
-  training: 'Training',
-  organisation: 'Organization',
-  organization: 'Organization',
-  it: 'IT'
+  youth_programme: 'Youth Programme',
+  adult_programme: 'Adult Programme',
+  tech_skill: 'Tech Skill',
+  training: 'Youth Programme',
+  organisation: 'Adult Programme',
+  organization: 'Adult Programme',
+  it: 'Tech Skill'
 };
 
 export const normalizeDepartment = (dept = '') => {
   const key = dept.toLowerCase().trim();
-  return DEPARTMENT_LABELS[key] || 'Organization';
+  return DEPARTMENT_LABELS[key] || 'Youth Programme';
 };
 
 export const formatDateDDMMYYYY = (rawDate) => {
@@ -92,18 +95,27 @@ export const fetchAdminDashboard = async (adminUserId = getAdminUserId()) => {
 
   // Parse department wise enrollment (handles both array and object responses)
   const deptWise = metrics.department_wise_enrollment || metrics.department_enrollments || metrics.enrollments_by_department || null;
-  const parsedDept = { training: 0, organisation: 0, organization: 0, it: 0 };
+  const parsedDept = { youth_programme: 0, adult_programme: 0, tech_skill: 0 };
   if (Array.isArray(deptWise)) {
     deptWise.forEach(item => {
-      const deptName = item.course__department || item.department || '';
+      const rawDeptName = item.course__department || item.department || '';
       const count = item.total_enrollments ?? item.count ?? 0;
-      if (deptName) {
-        parsedDept[deptName.toLowerCase()] = count;
+      if (rawDeptName) {
+        const key = rawDeptName.toLowerCase();
+        if (key === 'youth_programme' || key === 'training') parsedDept.youth_programme += count;
+        else if (key === 'adult_programme' || key === 'organisation' || key === 'organization') parsedDept.adult_programme += count;
+        else if (key === 'tech_skill' || key === 'it') parsedDept.tech_skill += count;
+        else parsedDept.youth_programme += count;
       }
     });
   } else if (typeof deptWise === 'object' && deptWise !== null) {
     Object.keys(deptWise).forEach(key => {
-      parsedDept[key.toLowerCase()] = deptWise[key];
+      const lower = key.toLowerCase();
+      const count = Number(deptWise[key]) || 0;
+      if (lower === 'youth_programme' || lower === 'training') parsedDept.youth_programme += count;
+      else if (lower === 'adult_programme' || lower === 'organisation' || lower === 'organization') parsedDept.adult_programme += count;
+      else if (lower === 'tech_skill' || lower === 'it') parsedDept.tech_skill += count;
+      else parsedDept.youth_programme += count;
     });
   }
 
@@ -153,9 +165,9 @@ export const fetchAdminCourses = async () => {
 export const buildDepartmentStats = (enrollmentRecords, courses = []) => {
   const courseMap = new Map(courses.map((course) => [course.id.toString(), course]));
   const counts = {
-    Training: 0,
-    Organization: 0,
-    IT: 0
+    'Youth Programme': 0,
+    'Adult Programme': 0,
+    'Tech Skill': 0
   };
 
   enrollmentRecords.forEach((record) => {
@@ -163,13 +175,15 @@ export const buildDepartmentStats = (enrollmentRecords, courses = []) => {
     const dept = normalizeDepartment(record.department || course?.department || '');
     if (counts[dept] != null) {
       counts[dept] += 1;
+    } else {
+      counts['Youth Programme'] += 1;
     }
   });
 
   return [
-    { name: 'Training', value: counts.Training, color: 'bg-blue-500' },
-    { name: 'Organization', value: counts.Organization, color: 'bg-purple-500' },
-    { name: 'IT', value: counts.IT, color: 'bg-emerald-500' }
+    { name: 'Youth Programme', value: counts['Youth Programme'], color: 'bg-purple-500' },
+    { name: 'Adult Programme', value: counts['Adult Programme'], color: 'bg-blue-500' },
+    { name: 'Tech Skill', value: counts['Tech Skill'], color: 'bg-emerald-500' }
   ];
 };
 

@@ -2,6 +2,10 @@ import { BASE_URL } from '../config';
 
 const COURSE_QUIZ_MAP_KEY = 'bsgup_course_quiz_map';
 
+export const getAdminUserId = () => {
+  return localStorage.getItem('adminUserId') || localStorage.getItem('userId') || '1';
+};
+
 export const getCourseQuizMap = () => {
   try {
     return JSON.parse(localStorage.getItem(COURSE_QUIZ_MAP_KEY) || '{}');
@@ -24,6 +28,7 @@ export const saveCourseQuizMapping = (courseId, quizId) => {
 };
 
 export const getCourseQuizId = (courseId) => {
+  if (!courseId) return null;
   const courseIdStr = courseId.toString();
   const map = getCourseQuizMap();
   const fromMap = map[courseIdStr];
@@ -35,217 +40,175 @@ export const getCourseQuizId = (courseId) => {
   return null;
 };
 
-export const parseQuizResponse = (data) => {
-  if (!data || data.success === false) return null;
-
-  if (data.quiz && data.questions) {
-    return {
-      title: data.quiz.title || 'Course Final Quiz',
-      passing_marks: data.quiz.passing_marks || data.quiz.passing_mark || 60,
-      duration: data.quiz.duration || 30,
-      questions: data.questions
-    };
-  }
-
-  let qData = data.data;
-  if (Array.isArray(qData) && qData.length > 0) qData = qData[0];
-
-  if (qData && (qData.title || qData.questions)) {
-    return {
-      title: qData.title || 'Course Final Quiz',
-      passing_marks: qData.passing_marks || qData.passing_mark || 60,
-      duration: qData.duration || 30,
-      questions: qData.questions || []
-    };
-  }
-
-  if (data.title || data.questions) {
-    return {
-      title: data.title || 'Course Final Quiz',
-      passing_marks: data.passing_marks || data.passing_mark || 60,
-      duration: data.duration || 30,
-      questions: data.questions || []
-    };
-  }
-
-  return null;
-};
-
-export const extractQuizId = (data, fallback = null) => {
-  if (!data) return fallback;
-  if (data.quiz?.quiz_id != null) return data.quiz.quiz_id;
-  if (data.quiz?.id != null) return data.quiz.id;
-  if (data.data?.quiz_id != null) return data.data.quiz_id;
-  if (data.data?.id != null) return data.data.id;
-  if (data.quiz_id != null) return data.quiz_id;
-  if (data.id != null) return data.id;
-  return fallback;
-};
-
-const normalizeQuestions = (questions = []) =>
-  questions.map((q, idx) => ({
-    ...q,
-    id: q.id || q.question_id || idx + 1
+export const normalizeQuestions = (questions = []) =>
+  (Array.isArray(questions) ? questions : []).map((q, idx) => ({
+    id: q.id || q.question_id || idx + 1,
+    question: q.question || '',
+    option1: q.option1 || '',
+    option2: q.option2 || '',
+    option3: q.option3 || '',
+    option4: q.option4 || '',
+    correct_answer: q.correct_answer || q.answer || '',
+    quiz: q.quiz || null,
+    is_active: q.is_active !== false
   }));
 
-export const fetchQuizForCourse = async (courseId, courseTitle = '') => {
-  const courseIdStr = courseId.toString();
-  const cacheKey = `quiz_id_course_${courseIdStr}`;
-
-  const tryFetch = async (url, linkedCourseId = courseIdStr) => {
-    const res = await fetch(url);
-    if (!res.ok) return null;
+/**
+ * Fetch all questions for a specific quiz ID using the verified endpoint:
+ * GET /bsgupadmin/create-question/?user_id=${userId}&quiz_id=${quizId}
+ */
+export const fetchQuestionsForQuiz = async (quizId, userId = getAdminUserId()) => {
+  if (!quizId) return [];
+  try {
+    const res = await fetch(`${BASE_URL}/bsgupadmin/create-question/?user_id=${encodeURIComponent(userId)}&quiz_id=${encodeURIComponent(quizId)}`);
+    if (!res.ok) return [];
     const data = await res.json();
-    if (data?.success === false) return null;
-    const parsed = parseQuizResponse(data);
-    if (!parsed) return null;
-    const quizId = extractQuizId(data, null);
-    if (quizId != null) {
-      saveCourseQuizMapping(linkedCourseId, quizId);
-      const numericId = parseInt(quizId, 10);
-      const knownMax = parseInt(localStorage.getItem('bsgup_max_quiz_id') || '0', 10);
-      if (numericId > knownMax) {
-        localStorage.setItem('bsgup_max_quiz_id', numericId.toString());
-      }
+    if (data && Array.isArray(data.data)) {
+      return normalizeQuestions(data.data);
     }
-    return {
-      ...parsed,
-      questions: normalizeQuestions(parsed.questions),
-      quizId: quizId != null ? quizId.toString() : null
-    };
-  };
-
-  // 1. Use quiz id from enrollment API mapping
-  const enrollmentQuizId = (() => {
-    try {
-      const map = JSON.parse(localStorage.getItem('bsgup_enrollment_quiz_map') || '{}');
-      return map[courseIdStr] || null;
-    } catch {
-      return null;
+    if (data && Array.isArray(data)) {
+      return normalizeQuestions(data);
     }
-  })();
-  if (enrollmentQuizId) {
-    const enrollmentResult = await tryFetch(
-      `${BASE_URL}/bsgupadmin/get-quiz/?quiz_id=${enrollmentQuizId}`,
-      courseIdStr
-    );
-    if (enrollmentResult) return enrollmentResult;
+  } catch (err) {
+    console.error(`Failed to fetch questions for quiz ${quizId}:`, err);
   }
-
-  // 2. Use saved course → quiz mapping (set when admin creates quiz)
-  const mappedQuizId = getCourseQuizId(courseIdStr);
-  if (mappedQuizId) {
-    const mappedResult = await tryFetch(
-      `${BASE_URL}/bsgupadmin/get-quiz/?quiz_id=${mappedQuizId}`,
-      courseIdStr
-    );
-    if (mappedResult) return mappedResult;
-  }
-
-  // 2. Try course_id lookup
-  let result = await tryFetch(`${BASE_URL}/bsgupadmin/get-quiz/?course_id=${courseIdStr}`);
-  if (result) return result;
-
-  // 3. Clear invalid cache where course id was wrongly stored as quiz id
-  const cachedQuizId = localStorage.getItem(cacheKey);
-  if (cachedQuizId === courseIdStr) {
-    localStorage.removeItem(cacheKey);
-    const map = getCourseQuizMap();
-    if (map[courseIdStr] === courseIdStr) {
-      delete map[courseIdStr];
-      localStorage.setItem(COURSE_QUIZ_MAP_KEY, JSON.stringify(map));
-    }
-  } else if (cachedQuizId) {
-    result = await tryFetch(`${BASE_URL}/bsgupadmin/get-quiz/?quiz_id=${cachedQuizId}`);
-    if (result) return result;
-  }
-
-  // 4. Last resort: discover quiz by matching title (backend course_id lookup is unreliable)
-  if (courseTitle) {
-    const normalizedCourseTitle = courseTitle.toLowerCase().trim();
-    const maxQuizId = parseInt(localStorage.getItem('bsgup_max_quiz_id') || '25', 10) + 5;
-
-    for (let quizId = 1; quizId <= maxQuizId; quizId += 1) {
-      const candidate = await tryFetch(
-        `${BASE_URL}/bsgupadmin/get-quiz/?quiz_id=${quizId}`,
-        courseIdStr
-      );
-      if (!candidate?.title) continue;
-
-      const normalizedQuizTitle = candidate.title.toLowerCase().trim();
-      if (
-        normalizedQuizTitle.includes(normalizedCourseTitle) ||
-        normalizedCourseTitle.includes(normalizedQuizTitle.replace(/\s*final quiz\s*$/i, '').trim())
-      ) {
-        return candidate;
-      }
-    }
-  }
-
-  return null;
+  return [];
 };
 
-export const fetchQuizForLesson = async (lessonId) => {
+/**
+ * Fetch all quizzes for a given course ID using the verified endpoint:
+ * GET /bsgupadmin/create-quiz/?user_id=${userId}&course_id=${courseId}
+ * Returns an array of formatted quiz objects with their questions attached.
+ */
+export const fetchQuizzesForCourse = async (courseId, userId = getAdminUserId()) => {
+  if (!courseId) return [];
+  try {
+    const res = await fetch(`${BASE_URL}/bsgupadmin/create-quiz/?user_id=${encodeURIComponent(userId)}&course_id=${encodeURIComponent(courseId)}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (!data || !data.success || !Array.isArray(data.data)) return [];
+
+    const quizzesList = [];
+    for (const item of data.data) {
+      if (item && item.quiz) {
+        const q = item.quiz;
+        const quizId = q.id?.toString() || q.quiz_id?.toString();
+        // Fetch questions for this quiz
+        const questions = quizId ? await fetchQuestionsForQuiz(quizId, userId) : [];
+
+        const formattedQuiz = {
+          id: quizId,
+          quizId: quizId,
+          lessonId: (item.id || q.lesson)?.toString(),
+          lessonTitle: item.title || q.lesson_name || `Lesson ${item.id}`,
+          courseId: courseId.toString(),
+          title: q.title || `Quiz #${quizId}`,
+          total_questions: q.total_questions || questions.length || 10,
+          marks_per_question: q.marks_per_question || 2,
+          total_marks: q.total_marks || ((q.total_questions || 10) * (q.marks_per_question || 2)),
+          passing_marks: q.passing_marks || 12,
+          duration: q.duration || 30,
+          is_final: q.is_final !== false,
+          is_active: q.is_active !== false,
+          questions: questions
+        };
+
+        quizzesList.push(formattedQuiz);
+
+        if (quizId) {
+          saveCourseQuizMapping(courseId, quizId);
+        }
+      }
+    }
+    return quizzesList;
+  } catch (err) {
+    console.error(`Failed to fetch quizzes for course ${courseId}:`, err);
+    return [];
+  }
+};
+
+/**
+ * Fetch quiz details and questions for a specific quiz ID
+ */
+export const fetchQuizById = async (quizId, userId = getAdminUserId()) => {
+  if (!quizId) return null;
+  const questions = await fetchQuestionsForQuiz(quizId, userId);
+  return {
+    quizId: quizId.toString(),
+    id: quizId.toString(),
+    questions: questions
+  };
+};
+
+/**
+ * Fetch quiz for a specific lesson
+ */
+export const fetchQuizForLesson = async (lessonId, courseId = null, userId = getAdminUserId()) => {
+  if (!lessonId) return null;
   const lessonIdStr = lessonId.toString();
 
-  const tryFetch = async (url) => {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data?.success === false) return null;
-    const parsed = parseQuizResponse(data);
-    if (!parsed) return null;
-    const quizId = extractQuizId(data, null);
-    return {
-      ...parsed,
-      questions: normalizeQuestions(parsed.questions),
-      quizId: quizId != null ? quizId.toString() : null
-    };
-  };
+  // If courseId is known, fetch directly via course quizzes
+  if (courseId) {
+    const courseQuizzes = await fetchQuizzesForCourse(courseId, userId);
+    const found = courseQuizzes.find(q => q.lessonId?.toString() === lessonIdStr);
+    if (found) return found;
+  }
 
-  // 1. Try lesson_id lookup
-  let result = await tryFetch(`${BASE_URL}/bsgupadmin/get-quiz/?lesson_id=${lessonIdStr}`);
-  if (result) return result;
-
-  // 2. Try lesson lookup
-  result = await tryFetch(`${BASE_URL}/bsgupadmin/get-quiz/?lesson=${lessonIdStr}`);
-  if (result) return result;
+  // If courseId is not provided, try querying courses list
+  try {
+    const coursesRes = await fetch(`${BASE_URL}/bsgupadmin/createcourse/`);
+    const coursesData = await coursesRes.json();
+    if (coursesData && coursesData.data) {
+      for (const course of coursesData.data) {
+        const courseQuizzes = await fetchQuizzesForCourse(course.id, userId);
+        const found = courseQuizzes.find(q => q.lessonId?.toString() === lessonIdStr);
+        if (found) {
+          found.courseTitle = course.title;
+          return found;
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Error in fetchQuizForLesson:", err);
+  }
 
   return null;
 };
 
-export const fetchQuizById = async (quizId, courseId = null) => {
-  const res = await fetch(`${BASE_URL}/bsgupadmin/get-quiz/?quiz_id=${quizId}`);
-  if (!res.ok) return null;
-  const data = await res.json();
-  if (data?.success === false) return null;
-  const parsed = parseQuizResponse(data);
-  if (!parsed) return null;
+/**
+ * Fetch the primary quiz for a course (e.g. for student exams)
+ */
+export const fetchQuizForCourse = async (courseId, courseTitle = '', userId = getAdminUserId()) => {
+  if (!courseId) return null;
+  const courseIdStr = courseId.toString();
 
-  const resolvedQuizId = extractQuizId(data, quizId)?.toString();
-  if (courseId != null && resolvedQuizId) {
-    saveCourseQuizMapping(courseId, resolvedQuizId);
+  const quizzes = await fetchQuizzesForCourse(courseIdStr, userId);
+  if (quizzes && quizzes.length > 0) {
+    // Prefer final exam quiz or the first available quiz
+    const finalQuiz = quizzes.find(q => q.is_final) || quizzes[0];
+    return {
+      title: finalQuiz.title,
+      passing_marks: finalQuiz.passing_marks,
+      duration: finalQuiz.duration,
+      total_questions: finalQuiz.total_questions,
+      marks_per_question: finalQuiz.marks_per_question,
+      total_marks: finalQuiz.total_marks,
+      questions: finalQuiz.questions || [],
+      quizId: finalQuiz.id?.toString()
+    };
   }
 
-  return {
-    ...parsed,
-    questions: normalizeQuestions(parsed.questions),
-    quizId: resolvedQuizId
-  };
+  return null;
 };
 
 export const syncCourseQuizMappings = async (courses = []) => {
-  const map = getCourseQuizMap();
-
+  const userId = getAdminUserId();
   await Promise.all(
     courses.map(async (course) => {
-      const courseIdStr = course.id.toString();
-      const knownQuizId = map[courseIdStr] || getCourseQuizId(courseIdStr);
-      if (!knownQuizId) return;
-
-      const quiz = await fetchQuizById(knownQuizId, course.id);
-      if (quiz?.quizId) {
-        saveCourseQuizMapping(course.id, quiz.quizId);
+      try {
+        await fetchQuizzesForCourse(course.id, userId);
+      } catch {
+        // Ignore
       }
     })
   );
